@@ -1,0 +1,47 @@
+---
+description: Python design standards — classes, functions, Pydantic, errors
+globs: src/**/*.py,tests/**/*.py
+alwaysApply: false
+---
+
+# Python design (TTD)
+
+Distilled from `docs/design/general.md`. When in doubt, read the full guide.
+
+## Classes vs functions
+
+Use a **class** when grouping related state/behavior, encapsulating a resource lifecycle, or defining a protocol.
+
+Use a **module-level function** when the operation is independent, has no siblings, and is not called from multiple places.
+
+Do not extract single-use 2–3 line helpers.
+
+## Data models
+
+- **`BaseModel`** for structured data crossing service boundaries
+- Set `model_config = ConfigDict(use_attribute_docstrings=True)` and document fields with attribute docstrings
+- Use `Field(...)` for constraints; prefer attribute docstrings over `Field(description=...)`
+- **ferro-orm `Model`** for persisted entities in `ttd.core`
+- **`pydantic.dataclasses.dataclass`** only for ephemeral internal bundles that never cross boundaries
+
+## Errors
+
+```python
+# BAD — silent failure
+except Exception:
+    return None
+
+# GOOD — raise in core; catch at CLI/API/TUI for user message + exit code
+if project is None:
+    raise LookupError(f"Project {project_id} not found")
+```
+
+No catch blocks that don't recover or re-raise with context.
+
+## DRY
+
+DRY when logic repeats. Do not abstract preemptively for single-use code.
+
+## Modules
+
+One subject per module. Split when subjects genuinely diverge — not because line count grew.

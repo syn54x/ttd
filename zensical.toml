@@ -1,0 +1,13 @@
+[project]
+site_name = "TTD"
+site_url = "https://syn54x.github.io/ttd/"
+docs_dir = "docs"
+site_dir = "site"
+
+nav = [
+  { "Home" = "index.md" },
+  { "Getting started" = "getting-started.md" },
+]
+
+[project.theme]
+name = "material"

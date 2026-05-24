@@ -1,0 +1,89 @@
+[project]
+name = "ttd"
+version = "0.0.0"
+description = "Terminal-native billable ledger for solo developers"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "cyclopts>=4.0.0",
+    "ferro-orm[alembic]>=0.10.0",
+    "litestar[standard]>=2.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "textual>=3.0.0",
+]
+
+[project.scripts]
+ttd = "ttd.cli.main:main"
+ttd-api = "ttd.api.app:run"
+ttd-tui = "ttd.tui.app:main"
+
+[dependency-groups]
+dev = [
+    "commitizen>=4.0.0",
+    "hypothesis>=6.0.0",
+    "prek>=0.4.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.9.0",
+    "ty>=0.0.1a0",
+    "zensical>=0.0.6",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.16,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ty.environment]
+python-version = "3.14"
+
+[tool.ty.src]
+include = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = [
+    "--cov=ttd",
+    "--cov-report=term-missing",
+    "--cov-config=pyproject.toml",
+]
+
+[tool.coverage.run]
+source = ["src/ttd"]
+branch = true
+relative_files = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_scheme = "pep440"
+version = "0.0.0"
+version_files = [
+    "pyproject.toml:project.version",
+    "src/ttd/__init__.py:__version__",
+]
+update_changelog_on_bump = true
+changelog_file = "CHANGELOG.md"
