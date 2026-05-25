@@ -17,10 +17,10 @@ Never implement domain rules, rounding, or persistence in surface packages.
 - Core services and DB access are `async`
 - CLI uses cyclopts async commands; API uses Litestar lifespan for DB init; TUI calls async core helpers from async hooks
 
-## v1 scope
+## Surface rollout (see `docs/roadmap.md`)
 
-- Ship CLI-first per `STRATEGY.md`
-- API/TUI scaffolds may exist but must not accumulate business logic ahead of their tracks
+- M1–M4: CLI-first ledger + CSV export; domain logic only in core
+- M5–M7: TUI, PDF/Markdown invoices, API — thin adapters; no business logic ahead of core services for each milestone
 
 ## Deeper reference
 

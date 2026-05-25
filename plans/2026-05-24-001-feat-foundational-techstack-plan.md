@@ -3,7 +3,7 @@ title: "feat: Foundational Python tech stack"
 type: feat
 status: completed
 date: 2026-05-24
-origin: docs/brainstorms/2026-05-24-foundational-techstack-requirements.md
+origin: brainstorms/2026-05-24-foundational-techstack-requirements.md
 ---
 
 # feat: Foundational Python tech stack
@@ -428,6 +428,6 @@ All surfaces call `ttd.core.services.*` with `await`. cyclopts dispatches async 
 
 ## Sources & References
 
-- **Origin document:** [docs/brainstorms/2026-05-24-foundational-techstack-requirements.md](docs/brainstorms/2026-05-24-foundational-techstack-requirements.md)
-- **Strategy:** [STRATEGY.md](STRATEGY.md)
+- **Origin document:** `brainstorms/2026-05-24-foundational-techstack-requirements.md`
+- **Strategy:** `STRATEGY.md`
 - uv, cyclopts, ferro-orm, Litestar, Textual, Prek, Zensical, commitizen docs (see Context & Research)

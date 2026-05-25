@@ -1,4 +1,8 @@
-# Getting started
+# TTD
+
+Terminal-native billable ledger for solo developers who invoice by the hour.
+
+See the [roadmap](roadmap.md) for milestone sequencing and [STRATEGY.md](https://github.com/syn54x/ttd/blob/main/STRATEGY.md) for product direction.
 
 ## Prerequisites
 

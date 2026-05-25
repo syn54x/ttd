@@ -4,9 +4,13 @@ site_url = "https://syn54x.github.io/ttd/"
 docs_dir = "docs"
 site_dir = "site"
 
+# CE planning artifacts (brainstorms/, plans/) live at repo root — outside docs_dir —
+# because Zensical does not yet support exclude_docs and would lint every markdown file.
+
 nav = [
   { "Home" = "index.md" },
   { "Getting started" = "getting-started.md" },
+  { "Roadmap" = "roadmap.md" },
 ]
 
 [project.theme]

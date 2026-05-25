@@ -1,0 +1,31 @@
+---
+description: CE brainstorm and plan output paths (repo root, not docs/)
+alwaysApply: true
+---
+
+# CE planning artifacts
+
+Compound Engineering skills default to `docs/brainstorms/` and `docs/plans/`. **In this repo, override those defaults.**
+
+## Write paths
+
+| Artifact | Directory | Filename pattern |
+|----------|-----------|------------------|
+| Requirements | `brainstorms/` | `YYYY-MM-DD-<topic>-requirements.md` |
+| Implementation plans | `plans/` | `YYYY-MM-DD-NNN-<type>-<name>-plan.md` |
+
+Create `brainstorms/` or `plans/` at the repo root if missing. **Do not** add new planning markdown under `docs/` — `docs/` is for the Zensical site only (`index.md`, `getting-started.md`, `roadmap.md`, `design/`).
+
+## Read and search
+
+When resuming, deepening, or linking CE work, search **`brainstorms/`** and **`plans/`** at repo root, not `docs/brainstorms/` or `docs/plans/`.
+
+## Cross-references
+
+- Plan frontmatter `origin:` → `brainstorms/<file>-requirements.md` (repo-relative, no `docs/` prefix)
+- Links in plans/requirements to strategy → `STRATEGY.md` at repo root
+- User-facing docs site → `docs/roadmap.md` only
+
+## Rationale
+
+Zensical does not support `exclude_docs`; CE markdown under `docs/` triggers build warnings. See `zensical.toml` comment.

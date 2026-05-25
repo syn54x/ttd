@@ -1,6 +1,6 @@
 # Getting started
 
-See the [repository README](../README.md) for clone, install, and check commands.
+See the [repository README](https://github.com/syn54x/ttd/blob/main/README.md) for clone, install, and check commands.
 
 ## Checks
 

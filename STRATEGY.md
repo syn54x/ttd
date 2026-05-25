@@ -1,6 +1,6 @@
 ---
 name: TTD
-last_updated: 2026-05-23
+last_updated: 2026-05-24
 ---
 
 # TTD Strategy
@@ -41,7 +41,7 @@ _Why it serves the approach:_ Capture has to match how solo devs actually work, 
 
 ### Export & billing rules
 
-Turn ledger data into billable outputs: global rounding, period totals, CSV in v1; line-item PDF/Markdown invoices and richer reports as the product matures—so billing doesn't require a second manual assembly pass.
+Turn ledger data into billable outputs: global rounding, period totals, CSV first (roadmap M3), then line-item PDF/Markdown invoices (M6) and richer reports later—so billing doesn't require a second manual assembly pass.
 
 _Why it serves the approach:_ Exports are the payoff; the ledger only wins if billing doesn't need a separate step.
 
@@ -55,7 +55,7 @@ _Why it serves the approach:_ Retroactive capture only works if the ledger is tr
 
 - Team features, payroll, and utilization tracking
 - Timer-first UX and productivity analytics as the product center
-- Invoices, TUI, and agent/Raycast integrations in v1
+- Agent/Raycast integrations before core + surfaces in [docs/roadmap.md](docs/roadmap.md) (M1–M7) are stable
 - Cloud accounts and sync as a launch requirement
 - Interval-only or "convert before bill" rules for duration entries
 - Full accounting / payments scope

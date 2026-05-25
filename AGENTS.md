@@ -35,9 +35,13 @@ Full guide: [`docs/design/general.md`](docs/design/general.md)
 
 - Python 3.14, uv, ruff, ty, pytest + Hypothesis for billing-sensitive invariants
 - Local-first SQLite; no cloud sync in v1
-- v1 ships CLI only — API/TUI are scaffolds until their tracks start (`STRATEGY.md`)
+- M1–M4: CLI-first ledger + CSV; M5–M7 add TUI, PDF/Markdown invoices, API — see `docs/roadmap.md`
 
 ## Planning artifacts
 
-- Requirements: `docs/brainstorms/*-requirements.md`
-- Plans: `docs/plans/*-plan.md`
+CE skills default to `docs/brainstorms/` and `docs/plans/` — **use repo-root paths in this project** (see `.cursor/rules/ce-planning-artifacts.mdc`):
+
+- Requirements: `brainstorms/*-requirements.md`
+- Plans: `plans/*-plan.md`
+
+Do not add new CE requirements or plans under `docs/` (Zensical site only).

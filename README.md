@@ -28,6 +28,10 @@ uv run ttd
 2. Enable GitHub Pages with **Source: GitHub Actions**.
 3. Trigger the **Release** workflow manually on `main`. Commitizen auto-bumps semver from conventional commits since the last tag, updates `CHANGELOG.md`, publishes to PyPI, and deploys docs.
 
+## Roadmap
+
+Milestone sequencing and v1 scope: [docs/roadmap.md](docs/roadmap.md). Product direction: [STRATEGY.md](STRATEGY.md).
+
 ## Architecture
 
 - `ttd.core` — async domain services and SQLite (ferro-orm)
