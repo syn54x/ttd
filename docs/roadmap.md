@@ -1,6 +1,6 @@
 ---
 title: Roadmap
-last_updated: 2026-05-24
+last_updated: 2026-05-25
 ---
 
 # Roadmap
@@ -16,9 +16,9 @@ This document sequences **when** TTD ships capability. [STRATEGY.md](https://git
 | Milestone | Theme | Status |
 |-----------|-------|--------|
 | M0 | Foundation | **Done** |
-| M1 | Billing ledger (core) | Next |
-| M2 | Terminal capture (CLI) | Planned |
-| M3 | Export & period close (CSV) | Planned |
+| M1 | Billing ledger (core) | **Done** |
+| M2 | Terminal capture (CLI) | **Done** |
+| M3 | Export & period close (CSV) | Next |
 | M4 | Data trust & hardening | Planned |
 | M5 | TUI | Planned |
 | M6 | PDF / Markdown invoices | Planned |
@@ -37,7 +37,7 @@ flowchart LR
     M7 --> M8[M8 Release]
 ```
 
-M2 can start as soon as M1 models and services stabilize. M3 design can run in parallel with late M2. **M5–M7** are thin surfaces and export formats over the same core — no duplicate domain logic.
+M3 is next — export and period close build on the M1 ledger and M2 CLI dogfooding. **M5–M7** are thin surfaces and export formats over the same core — no duplicate domain logic.
 
 ---
 
