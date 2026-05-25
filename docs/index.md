@@ -26,7 +26,14 @@ CI runs the same command as local full-repo verification:
 prek run --all-files
 ```
 
-## Run TTD
+## Install (released)
+
+```bash
+uv tool install ttd-ledger
+ttd --help
+```
+
+## Run TTD (development)
 
 ```bash
 uv run ttd

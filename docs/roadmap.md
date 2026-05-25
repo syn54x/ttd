@@ -205,7 +205,7 @@ M2 can start as soon as M1 models and services stabilize. M3 design can run in p
 
 **Ship when:**
 
-- First semver release to PyPI (`uv tool install ttd` / `uvx ttd`)
+- First semver release to PyPI (`uv tool install ttd-ledger`; CLI command `ttd`)
 - User-facing docs: CLI workflow, TUI overview, API usage, period close through CSV and invoice export
 - GitHub branch protection + PyPI trusted publishing verified
 - Maintainer runbook exercised once end-to-end
@@ -244,5 +244,7 @@ For each milestone (starting with **M1**):
 Land before or with **M8**:
 
 - [ ] GitHub branch protection (require CI on PRs)
-- [ ] PyPI package name confirmed (`ttd` vs fallback)
+- [x] PyPI package name confirmed (`ttd-ledger`; CLI `ttd`)
+- [ ] PyPI project registered and trusted publisher configured (see README release runbook)
+- [ ] `just release-smoke` passes on `main`
 - [ ] First manual release workflow dry-run on `main`

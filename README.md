@@ -2,7 +2,18 @@
 
 Terminal-native billable ledger for solo developers who invoice by the hour.
 
-## Quick start
+## Install
+
+PyPI distribution: **`ttd-ledger`**. CLI command: **`ttd`**.
+
+```bash
+uv tool install ttd-ledger
+ttd --help
+```
+
+One-off: `uvx ttd-ledger`.
+
+## Quick start (development)
 
 ```bash
 just setup
@@ -20,14 +31,57 @@ uv run ttd
 | `prek run --all-files` | Run all checks (same as CI) |
 | `uv run ttd` | CLI (Rich tables; health check by default) |
 | `just db-seed` | Seed local DB with demo clients, projects, and entries |
+| `just release-smoke` | Build wheel/sdist and verify `ttd` from the artifact |
+| `just release` | Full checks + smoke, then trigger GitHub Release workflow |
 | `uv run ttd-api` | Litestar API (scaffold) |
 | `uv run ttd-tui` | Textual TUI (scaffold) |
 
 ## Release (maintainers)
 
-1. Configure [PyPI trusted publishing](https://docs.pypi.org/trusted-publishers/) for this repository's `release.yml` workflow.
-2. Enable GitHub Pages with **Source: GitHub Actions**.
-3. Trigger the **Release** workflow manually on `main`. Commitizen auto-bumps semver from conventional commits since the last tag, updates `CHANGELOG.md`, publishes to PyPI, and deploys docs.
+### One-time setup
+
+1. **PyPI project** — Register [ttd-ledger](https://pypi.org/manage/projects/) (name must match `project.name` in `pyproject.toml`).
+2. **Trusted publishing** — On that project: *Publishing* → *Add a new pending publisher* → **GitHub**:
+
+   | Field | Value |
+   |-------|-------|
+   | Owner | `syn54x` |
+   | Repository | `ttd` |
+   | Workflow name | `release.yml` |
+   | Environment | `pypi` |
+
+3. **GitHub environment** — Repo *Settings* → *Environments* → create **`pypi`** (no secrets required for OIDC).
+4. **GitHub Pages** — *Settings* → *Pages* → **Source: GitHub Actions**.
+
+### Pre-release check
+
+```bash
+just release-smoke
+```
+
+Builds the wheel/sdist and runs `ttd --help` from the artifact (same layout CI publishes).
+
+### Publish
+
+1. Complete [one-time setup](#one-time-setup) above.
+2. Merge to `main` with conventional commits since the last tag.
+3. From a clean, pushed `main`:
+
+   ```bash
+   just release
+   ```
+
+   Runs CI checks, `release-smoke`, then triggers the **Release** workflow (`cz bump`, PyPI publish, docs deploy).
+
+   Watch progress: `gh run watch --workflow release.yml`
+
+4. Smoke test after publish:
+
+   ```bash
+   uvx ttd-ledger --help
+   uv tool install ttd-ledger
+   ttd
+   ```
 
 ## Roadmap
 

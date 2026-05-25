@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/ttd
+      url: https://pypi.org/p/ttd-ledger
     steps:
       - uses: actions/checkout@v4
         with:
