@@ -67,7 +67,10 @@ jobs:
           EOF
 
       - name: Push release commit and tag
-        run: git push origin main --follow-tags
+        run: |
+          TAG=$(git describe --tags --abbrev=0)
+          git push origin main
+          git push origin "${TAG}"
 
       - name: Build package
         run: uv build

@@ -90,3 +90,4 @@ version_files = [
 ]
 update_changelog_on_bump = true
 changelog_file = "CHANGELOG.md"
+annotated_tag = true
