@@ -19,6 +19,7 @@ def require_id(value: UUID | None, label: str) -> UUID:
         raise ValidationError(f"{label} is missing an id")
     return value
 
+
 async def ensure_db() -> None:
     """Initialize the ledger database for this CLI invocation."""
     await init_db()

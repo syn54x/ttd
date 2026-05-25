@@ -2,6 +2,14 @@
 
 See the [repository README](https://github.com/syn54x/ttd/blob/main/README.md) for clone, install, and check commands.
 
+## Setup
+
+```bash
+just setup
+```
+
+Runs `uv sync` and `uv run prek install` (same as the README quick start).
+
 ## Checks
 
 ```bash

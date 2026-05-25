@@ -55,9 +55,7 @@ async def clear_demo_data() -> None:
         client_id = _require_id(client.id, "client")
         for project in await project_service.list_projects_for_client(client_id):
             project_id = _require_id(project.id, "project")
-            for entry in await entry_service.list_time_entries_for_project(
-                project_id
-            ):
+            for entry in await entry_service.list_time_entries_for_project(project_id):
                 entry_id = _require_id(entry.id, "time entry")
                 await entry_service.delete_time_entry(entry_id)
             await project_service.delete_project(project_id)

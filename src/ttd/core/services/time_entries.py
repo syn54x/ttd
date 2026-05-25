@@ -113,9 +113,7 @@ async def update_interval_entry(entry_id: UUID, data: UpdateIntervalEntry) -> Ti
         entry.note = data.note
     _require_interval_fields(entry)
     assert entry.started_at is not None and entry.ended_at is not None
-    entry.billable_hours = recompute_interval_snapshot(
-        entry.started_at, entry.ended_at
-    )
+    entry.billable_hours = recompute_interval_snapshot(entry.started_at, entry.ended_at)
     await entry.save()
     return entry
 

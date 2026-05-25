@@ -28,12 +28,8 @@ async def add(
     ] = "hourly",
     rate: Annotated[str | None, Parameter(name="--rate")] = None,
     currency: Annotated[str | None, Parameter(name="--currency")] = None,
-    contract_total: Annotated[
-        str | None, Parameter(name="--contract-total")
-    ] = None,
-    soft_max_hours: Annotated[
-        str | None, Parameter(name="--soft-max-hours")
-    ] = None,
+    contract_total: Annotated[str | None, Parameter(name="--contract-total")] = None,
+    soft_max_hours: Annotated[str | None, Parameter(name="--soft-max-hours")] = None,
 ) -> None:
     """Add a project under a client."""
     try:
@@ -89,12 +85,8 @@ async def update(
     name: str | None = None,
     rate: Annotated[str | None, Parameter(name="--rate")] = None,
     currency: Annotated[str | None, Parameter(name="--currency")] = None,
-    contract_total: Annotated[
-        str | None, Parameter(name="--contract-total")
-    ] = None,
-    soft_max_hours: Annotated[
-        str | None, Parameter(name="--soft-max-hours")
-    ] = None,
+    contract_total: Annotated[str | None, Parameter(name="--contract-total")] = None,
+    soft_max_hours: Annotated[str | None, Parameter(name="--soft-max-hours")] = None,
     clear_rate_override: Annotated[
         bool, Parameter(name="--clear-rate-override")
     ] = False,

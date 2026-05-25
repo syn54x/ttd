@@ -74,9 +74,7 @@ async def list_entries(
         period_start = parse_date(from_date) if from_date is not None else None
         period_end = parse_date(to_date) if to_date is not None else None
         print_entries(
-            _filter_by_period(
-                entries, from_date=period_start, to_date=period_end
-            )
+            _filter_by_period(entries, from_date=period_start, to_date=period_end)
         )
     except BaseException as exc:
         cli_exit(exc)
@@ -114,9 +112,7 @@ async def edit(
             if time_from is not None or time_to is not None:
                 from ttd.core.exceptions import ValidationError
 
-                raise ValidationError(
-                    "Duration entries use --hours, not --from/--to"
-                )
+                raise ValidationError("Duration entries use --hours, not --from/--to")
             updated = await entry_service.update_duration_entry(
                 entry_id,
                 UpdateDurationEntry(
@@ -130,9 +126,7 @@ async def edit(
             if hours is not None:
                 from ttd.core.exceptions import ValidationError
 
-                raise ValidationError(
-                    "Interval entries use --from/--to, not --hours"
-                )
+                raise ValidationError("Interval entries use --from/--to, not --hours")
             started = (
                 parse_clock_on_date(day or entry.work_date, time_from)
                 if time_from

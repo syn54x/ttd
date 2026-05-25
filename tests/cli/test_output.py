@@ -4,12 +4,13 @@ from decimal import Decimal
 
 from ttd.cli.output import print_entries, print_projects
 from ttd.core.models.enums import BillingMode
-from ttd.core.models.project import Project
 from ttd.core.schemas import CreateProject
 from ttd.core.services import projects as project_service
 
 
-async def test_print_projects_with_string_billing_mode(db, sample_client, capsys) -> None:
+async def test_print_projects_with_string_billing_mode(
+    db, sample_client, capsys
+) -> None:
     await project_service.create_project(
         CreateProject(
             client_id=sample_client.id,
@@ -26,9 +27,7 @@ async def test_print_projects_with_string_billing_mode(db, sample_client, capsys
     assert "hourly" in out
 
 
-async def test_print_entries_with_string_entry_mode(
-    db, hourly_project, capsys
-) -> None:
+async def test_print_entries_with_string_entry_mode(db, hourly_project, capsys) -> None:
     from datetime import date
 
     from ttd.core.schemas import CreateDurationEntry
