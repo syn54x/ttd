@@ -6,10 +6,11 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "cyclopts>=4.0.0",
-    "ferro-orm[alembic]>=0.10.0",
+    "ferro-orm[alembic]>=0.10.5",
     "litestar[standard]>=2.0.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
+    "rich>=13.0.0",
     "textual>=3.0.0",
 ]
 

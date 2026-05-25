@@ -5,7 +5,7 @@ TTD is a terminal-native billable ledger. Read `STRATEGY.md` for product scope b
 ## Layout
 
 - `src/ttd/core/` — async domain services and persistence; **all business logic here**
-- `src/ttd/cli/`, `api/`, `tui/` — thin adapters only (parse → call core → format)
+- `src/ttd/cli/`, `api/`, `tui/` — thin adapters only (parse → call core → format); CLI output uses **Rich** (`ttd.cli.console`, `ttd.cli.output`)
 - `tests/` — pytest; mirror `core` structure for service tests
 
 ## Commands
@@ -45,3 +45,7 @@ CE skills default to `docs/brainstorms/` and `docs/plans/` — **use repo-root p
 - Plans: `plans/*-plan.md`
 
 Do not add new CE requirements or plans under `docs/` (Zensical site only).
+
+## Ferro-orm upstream
+
+Persistence uses [syn54x/ferro-orm](https://github.com/syn54x/ferro-orm). If behavior looks like an ORM/runtime bug (especially cold DB reads vs in-memory instances), follow `.cursor/rules/ferro-upstream.mdc`: confirm with a minimal repro, **ask the user** before opening issues or feature requests on ferro-orm, and keep workarounds in TTD until a release fixes it.

@@ -1,7 +1,7 @@
 # Data layer
 
-**Date:** 2026-05-25  
-**Status:** Active  
+**Date:** 2026-05-25
+**Status:** Active
 **Applies to:** `src/ttd/core/models/`, `src/ttd/core/db.py`
 
 Extends [general.md](general.md). Defines persistence conventions for the billing ledger.
@@ -78,6 +78,18 @@ No soft-archive in M1.
 columns (`FerroField(db_type="text")`), not native DB enums. Values are the enum’s
 string values (e.g. `hourly`, `duration`). This keeps `auto_migrate` and future
 Alembic revisions straightforward when adding enum members.
+
+**Hydration:** ferro-orm **≥ 0.10.5** (fix in [PR #66](https://github.com/syn54x/ferro-orm/pull/66),
+closes [#65](https://github.com/syn54x/ferro-orm/issues/65)) registers enum fields at
+class definition and coerces text columns back to `StrEnum` on cold fetch. TTD pins
+`ferro-orm>=0.10.5`.
+
+`enum_value()` in `ttd.core.models.enums` remains useful for display and for any
+value that might still be a plain `str` (e.g. tests); prefer `.value` on hydrated
+models when the type is known to be `StrEnum`.
+
+Historical repro scripts: `docs/upstream/` (fail on ferro ≤ 0.10.3). Agents: see
+`.cursor/rules/ferro-upstream.mdc`.
 
 ---
 

@@ -265,17 +265,17 @@ wheels = [
 
 [[package]]
 name = "ferro-orm"
-version = "0.10.3"
+version = "0.10.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a5/2b/b33a032c882ad94d2c5c15a884480fec5afd9dda47af1f1cab03beba21a7/ferro_orm-0.10.3.tar.gz", hash = "sha256:f05a8fb11c2cacc940ec0469b787704d06dba92c41f60d816fcdf74df3b0f81e", size = 464503, upload-time = "2026-05-21T01:17:17.202Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9e/b2/990df431bd95fc6f776c2e22fafb3bb7b5bf934312fd16fd3e5ca2b62db7/ferro_orm-0.10.5.tar.gz", hash = "sha256:af754e1b31c4595ee74da98319f850c1f6a9b9fc8895952b6e333501e4840d13", size = 472485, upload-time = "2026-05-25T17:30:25.678Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c9/e8/c32a58b8ad898b97d05ec6d488632bb02ace3023ab9bda9986c94275b72d/ferro_orm-0.10.3-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:1bbdfde2154af2be614394dcd745e28ea183fc8a29e23891df8b763df26fb77b", size = 4467591, upload-time = "2026-05-21T01:17:08.752Z" },
-    { url = "https://files.pythonhosted.org/packages/e0/37/4ece344d7d16736b64398d263e8d6741902a5ad2a16dde8a302026b5ae62/ferro_orm-0.10.3-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e39a0d0ac58b9dc3850384f25840754a6ebae4b8751fa14975b84d575a6039a9", size = 4829239, upload-time = "2026-05-21T01:17:11.035Z" },
-    { url = "https://files.pythonhosted.org/packages/28/9a/23163af1f9cf77625d7c54f99b480d1df4433b85b48c9822d182f2d7f25e/ferro_orm-0.10.3-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8cd46ecb7b5fdfbd6ccb1d7902c20f96e0d82923d3c4ee06f507153bc8f8c051", size = 4956686, upload-time = "2026-05-21T01:17:13.112Z" },
-    { url = "https://files.pythonhosted.org/packages/1c/31/adbce519e0bdf50b21a7f9e48ee12c729ebd5b4acd1035632e4d0e6788e5/ferro_orm-0.10.3-cp39-abi3-win_amd64.whl", hash = "sha256:9e149ee23207bba70c3c7293ed9858d1f1795215f3475ffd45054ad9f3c61caa", size = 4373047, upload-time = "2026-05-21T01:17:15.078Z" },
+    { url = "https://files.pythonhosted.org/packages/e9/8a/94e02abbad3216daba6363c184c700353569d4a90e9ce303d87ed0954112/ferro_orm-0.10.5-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:66e9c8b7ed4eeb08b7b4fdfe233a2edb1a87c5d1824c53228b9f1fa42d7c3ce0", size = 4484540, upload-time = "2026-05-25T17:30:17.657Z" },
+    { url = "https://files.pythonhosted.org/packages/9e/5b/c25a15974442fe232b1320b3215bd7c302de6d7104a79bdd5e2982e86026/ferro_orm-0.10.5-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:fefe3b6df656023af1419a4106b9123e156b803b4680dcda75696062881b8ecd", size = 4832148, upload-time = "2026-05-25T17:30:19.768Z" },
+    { url = "https://files.pythonhosted.org/packages/1c/b2/90ab18cd4e74fdfb9e7fa9cdfb2ff277c5f5996c418b4850e6e86902409b/ferro_orm-0.10.5-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4082e781f13537354cda8b5097521dee1274b7c3b8cbc7ca6232962a6eded9d6", size = 4961140, upload-time = "2026-05-25T17:30:21.879Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/03/a63ec192cec120ff489ca9e9b1633dd870675de4629396ffad785d87c6b7/ferro_orm-0.10.5-cp39-abi3-win_amd64.whl", hash = "sha256:deb0eadb1d458e1b2ae8281e665610a68457c83f2de89e9c8af6eaaa82e2976d", size = 4372439, upload-time = "2026-05-25T17:30:23.814Z" },
 ]
 
 [package.optional-dependencies]
@@ -1096,6 +1096,7 @@ dependencies = [
     { name = "litestar", extra = ["standard"] },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "rich" },
     { name = "textual" },
 ]
 
@@ -1115,10 +1116,11 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "cyclopts", specifier = ">=4.0.0" },
-    { name = "ferro-orm", extras = ["alembic"], specifier = ">=0.10.0" },
+    { name = "ferro-orm", extras = ["alembic"], specifier = ">=0.10.5" },
     { name = "litestar", extras = ["standard"], specifier = ">=2.0.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
+    { name = "rich", specifier = ">=13.0.0" },
     { name = "textual", specifier = ">=3.0.0" },
 ]
 
