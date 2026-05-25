@@ -38,7 +38,33 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Bump version and changelog
-        run: uv run cz bump --yes
+        run: uv run cz bump --yes --check-consistency --changelog --changelog-to-stdout > release-body.md
+
+      - name: Verify release body
+        run: test -s release-body.md
+
+      - name: Verify release version
+        run: |
+          python3 - <<'EOF'
+          import re
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          text = Path("pyproject.toml").read_text()
+          match = re.search(r'^\[project\][\s\S]*?^version = "([^"]+)"', text, re.MULTILINE)
+          if not match:
+              sys.exit("missing [project].version in pyproject.toml")
+          project_version = match.group(1)
+          tag = subprocess.check_output(
+              ["git", "describe", "--tags", "--abbrev=0"], text=True
+          ).strip().removeprefix("v")
+          if project_version != tag:
+              sys.exit(
+                  f"version mismatch: [project].version={project_version!r} tag=v{tag!r}"
+              )
+          print(f"release version ok: {project_version}")
+          EOF
 
       - name: Push release commit and tag
         run: git push origin main --follow-tags
@@ -48,6 +74,16 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$(git describe --tags --abbrev=0)
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --notes-file release-body.md \
+            dist/*.tar.gz dist/*.whl
 
   docs:
     needs: release

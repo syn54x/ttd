@@ -71,7 +71,7 @@ Builds the wheel/sdist and runs `ttd --help` from the artifact (same layout CI p
    just release
    ```
 
-   Runs CI checks, `release-smoke`, then triggers the **Release** workflow (`cz bump`, PyPI publish, docs deploy).
+   Runs CI checks, `release-smoke`, then triggers the **Release** workflow (`cz bump`, PyPI publish, GitHub Release, docs deploy).
 
    Watch progress: `gh run watch --workflow release.yml`
 
