@@ -1,0 +1,40 @@
+---
+description: When Ferro-orm behavior looks wrong, triage upstream and ask before filing on syn54x/ferro-orm.
+alwaysApply: true
+---
+
+# Ferro-orm upstream (syn54x/ferro-orm)
+
+TTD persists ledger data with **ferro-orm** (`ferro` on PyPI). The canonical repo is [syn54x/ferro-orm](https://github.com/syn54x/ferro-orm).
+
+## Suspect a Ferro bug when
+
+- Behavior differs between **in-memory** model instances (right after `create` / `save`) and **cold reads** (`reset_engine()` then `all()` / `where().first()`).
+- `Model._fix_types` runs but fields stay as raw DB types (`str` for text-backed `StrEnum`, etc.).
+- `Model._enum_fields` is `{}` for fields declared as `Annotated[SomeEnum, FerroField(db_type="text")]`.
+- Schema registration looks correct (`enum_type_name` in `__ferro_schema__`) but hydration does not match (fixed ferro-orm **≥ 0.10.5**, [PR #66](https://github.com/syn54x/ferro-orm/pull/66)).
+- Query / migration / Rust-core errors that do not originate in `ttd.core` service logic.
+
+**Not usually Ferro:** validation rules in `ttd.core.services`, CLI formatting, DTOs in `schemas.py`, or business rules in `domain/`.
+
+## Agent workflow
+
+1. **Confirm** the failure is in Ferro (minimal repro in `docs/upstream/` or a short inline script).
+2. **Do not** open GitHub issues or PRs on `syn54x/ferro-orm` unless the user asked you to.
+3. **Ask the user** explicitly, for example:
+   - *"This looks like a ferro-orm hydration bug (cold load returns `str` instead of `StrEnum`). Want me to open an issue on [syn54x/ferro-orm](https://github.com/syn54x/ferro-orm/issues)?"*
+   - For enhancements: *"Want me to file a feature request on ferro-orm?"*
+4. If the user says yes: use `gh issue create --repo syn54x/ferro-orm` with repro steps and ferro version (`uv run python -c "import ferro; print(ferro.version())"`). **Paste the full minimal repro script in the issue body** — ferro maintainers do not have the TTD repo. Keep copies under `docs/upstream/` in this project for regression only; do not link to TTD paths as the repro.
+5. Until upstream fixes ship: document workarounds in `docs/design/data-layer.md` and keep TTD-side helpers (e.g. `enum_value()`); avoid patching `.venv`.
+
+## Repro scripts
+
+| Script | Purpose |
+|--------|---------|
+| `docs/upstream/ferro-enum-hydration-repro.py` | TTD consumer repro (cold fetch → `str`) |
+| `docs/upstream/ferro-enum-hydration-repro-standalone.py` | ferro-orm only (`uv run` script) |
+
+```bash
+uv run python docs/upstream/ferro-enum-hydration-repro.py
+uv run docs/upstream/ferro-enum-hydration-repro-standalone.py
+```

@@ -5,6 +5,9 @@ from contextlib import asynccontextmanager
 
 from ferro import connect, reset_engine
 
+from ttd.core import (
+    models as _models,  # noqa: F401 — register Model metadata before connect
+)
 from ttd.core.config import Settings, get_settings
 
 _db_initialized = False
@@ -25,7 +28,6 @@ async def close_db() -> None:
     if not _db_initialized:
         return
     reset_engine()
-    _db_initialized = False
     _db_initialized = False
 
 

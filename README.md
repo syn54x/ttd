@@ -5,8 +5,7 @@ Terminal-native billable ledger for solo developers who invoice by the hour.
 ## Quick start
 
 ```bash
-uv sync
-prek install
+just setup
 prek run --all-files
 uv run ttd
 ```
@@ -15,10 +14,12 @@ uv run ttd
 
 | Command | Purpose |
 |---------|---------|
-| `uv sync` | Install dependencies |
-| `prek install` | Install git hooks |
+| `just setup` | Install dependencies (`uv sync`) and git hooks (`uv run prek install`) |
+| `uv sync` | Install dependencies only |
+| `prek install` | Install git hooks only |
 | `prek run --all-files` | Run all checks (same as CI) |
-| `uv run ttd` | CLI health check |
+| `uv run ttd` | CLI (Rich tables; health check by default) |
+| `just db-seed` | Seed local DB with demo clients, projects, and entries |
 | `uv run ttd-api` | Litestar API (scaffold) |
 | `uv run ttd-tui` | Textual TUI (scaffold) |
 
