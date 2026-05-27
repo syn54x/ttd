@@ -1,0 +1,33 @@
+---
+description: Use uv for deps and inline scripts; avoid pip
+globs: "**/*"
+alwaysApply: true
+---
+
+# uv workflow (TTD)
+
+TTD uses **uv** for Python tooling and dependency management.
+
+## Non-negotiables
+
+- Do **not** use `pip install`, `pipx`, Poetry, or hand-rolled virtualenvs.
+- Run project commands through `uv run ...` so the correct environment is used.
+
+## One-off / inline scripts
+
+Use `uv run --with ...` instead of installing packages manually:
+
+```bash
+uv run --with httpx python -c "import httpx; print('ok')"
+uv run --no-project --with httpx python -c "import httpx; print('ok')"
+```
+
+## Adding/removing project dependencies
+
+- Add: `uv add <pkg>`
+- Remove: `uv remove <pkg>`
+- Then: `uv sync`
+
+## Before finishing work
+
+Run **`just check`** (ruff + ty). See `.cursor/rules/quality-gate.mdc`.

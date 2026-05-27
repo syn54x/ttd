@@ -7,10 +7,15 @@ from uuid import UUID
 
 from cyclopts import App, Parameter
 
+from ttd.cli import collect
 from ttd.cli.console import success
-from ttd.cli.errors import cli_exit
+from ttd.cli.errors import cli_exit, cli_exit_cancelled
+from ttd.cli.inputs import ProjectAddInput, ProjectDeleteInput, ProjectUpdateInput
+from ttd.cli.interactive import RunMode, format_missing_fields, resolve_run_mode
 from ttd.cli.output import print_projects
+from ttd.cli.parameters import InteractiveOpt
 from ttd.cli.runtime import ensure_db, parse_decimal, require_id, resolve_client
+from ttd.core.exceptions import ValidationError
 from ttd.core.models.enums import BillingMode
 from ttd.core.schemas import CreateProject, UpdateProject
 from ttd.core.services import projects as project_service
@@ -18,44 +23,84 @@ from ttd.core.services import projects as project_service
 app = App(name="project", help="Manage projects.")
 
 
+def _parse_billing_mode(value: str) -> BillingMode:
+    normalized = value.strip().lower().replace("-", "_")
+    try:
+        return BillingMode(normalized)
+    except ValueError as exc:
+        raise ValidationError(
+            f"Invalid billing mode '{value}'; use hourly or fixed_price"
+        ) from exc
+
+
 @app.command
 async def add(
-    name: str,
+    name: Annotated[str | None, Parameter(help="Project name.")] = None,
     *,
-    client: Annotated[str, Parameter(name="--client", help="Client name.")],
+    client: Annotated[
+        str | None, Parameter(name="--client", help="Client name.")
+    ] = None,
     billing_mode: Annotated[
-        str, Parameter(name="--billing-mode", help="hourly or fixed_price.")
-    ] = "hourly",
+        str | None, Parameter(name="--billing-mode", help="hourly or fixed_price.")
+    ] = None,
     rate: Annotated[str | None, Parameter(name="--rate")] = None,
     currency: Annotated[str | None, Parameter(name="--currency")] = None,
     contract_total: Annotated[str | None, Parameter(name="--contract-total")] = None,
     soft_max_hours: Annotated[str | None, Parameter(name="--soft-max-hours")] = None,
+    interactive: InteractiveOpt = False,
 ) -> None:
-    """Add a project under a client."""
+    """Add a project. No args runs guided prompts; -i fills missing fields."""
     try:
         await ensure_db()
-        owner = await resolve_client(client_id=None, client_name=client)
-        mode = _parse_billing_mode(billing_mode)
+        values = ProjectAddInput(
+            name=name,
+            client=client,
+            billing_mode=billing_mode,
+            rate=rate,
+            currency=currency,
+            contract_total=contract_total,
+            soft_max_hours=soft_max_hours,
+        )
+        mode, missing = resolve_run_mode(
+            subcommand=("project", "add"),
+            interactive_flag=interactive,
+            provided=values.as_provided(),
+            required_for_run=("name", "client"),
+        )
+        if mode == RunMode.ERROR:
+            raise ValidationError(format_missing_fields(missing))
+        if mode == RunMode.INTERACTIVE:
+            values = await collect.collect_project_add(values)
+
+        if values.client is None or values.name is None:
+            raise ValidationError(format_missing_fields(["name", "client"]))
+
+        owner = await resolve_client(client_id=None, client_name=values.client)
+        mode_enum = _parse_billing_mode(values.billing_mode or "hourly")
         project = await project_service.create_project(
             CreateProject(
                 client_id=require_id(owner.id, "client"),
-                name=name,
-                billing_mode=mode,
-                hourly_rate=parse_decimal(rate) if rate is not None else None,
-                currency=currency,
+                name=values.name,
+                billing_mode=mode_enum,
+                hourly_rate=(
+                    parse_decimal(values.rate) if values.rate is not None else None
+                ),
+                currency=values.currency,
                 contract_total=(
-                    parse_decimal(contract_total)
-                    if contract_total is not None
+                    parse_decimal(values.contract_total)
+                    if values.contract_total is not None
                     else None
                 ),
                 soft_max_hours=(
-                    parse_decimal(soft_max_hours)
-                    if soft_max_hours is not None
+                    parse_decimal(values.soft_max_hours)
+                    if values.soft_max_hours is not None
                     else None
                 ),
             )
         )
         success(f"Created project {_short(project.id)} ({project.name})")
+    except KeyboardInterrupt:
+        cli_exit_cancelled()
     except BaseException as exc:
         cli_exit(exc)
 
@@ -80,7 +125,7 @@ async def list_projects(
 
 @app.command
 async def update(
-    project_id: UUID,
+    project_id: Annotated[UUID | None, Parameter(help="Project UUID.")] = None,
     *,
     name: str | None = None,
     rate: Annotated[str | None, Parameter(name="--rate")] = None,
@@ -90,55 +135,91 @@ async def update(
     clear_rate_override: Annotated[
         bool, Parameter(name="--clear-rate-override")
     ] = False,
+    interactive: InteractiveOpt = False,
 ) -> None:
-    """Update a project."""
+    """Update a project. No args runs guided prompts."""
     try:
         await ensure_db()
+        values = ProjectUpdateInput(
+            project_id=project_id,
+            name=name,
+            rate=rate,
+            currency=currency,
+            contract_total=contract_total,
+            soft_max_hours=soft_max_hours,
+            clear_rate_override=clear_rate_override,
+        )
+        mode, missing = resolve_run_mode(
+            subcommand=("project", "update"),
+            interactive_flag=interactive,
+            provided=values.as_provided(),
+            required_for_run=(),
+        )
+        if mode == RunMode.ERROR:
+            raise ValidationError(format_missing_fields(missing))
+        if mode == RunMode.INTERACTIVE:
+            values = await collect.collect_project_update(values)
+
         project = await project_service.update_project(
-            project_id,
+            values.require_project_id(),
             UpdateProject(
-                name=name,
-                hourly_rate=parse_decimal(rate) if rate is not None else None,
-                currency=currency,
+                name=values.name,
+                hourly_rate=(
+                    parse_decimal(values.rate) if values.rate is not None else None
+                ),
+                currency=values.currency,
                 contract_total=(
-                    parse_decimal(contract_total)
-                    if contract_total is not None
+                    parse_decimal(values.contract_total)
+                    if values.contract_total is not None
                     else None
                 ),
                 soft_max_hours=(
-                    parse_decimal(soft_max_hours)
-                    if soft_max_hours is not None
+                    parse_decimal(values.soft_max_hours)
+                    if values.soft_max_hours is not None
                     else None
                 ),
-                clear_rate_override=clear_rate_override,
+                clear_rate_override=values.clear_rate_override,
             ),
         )
         success(f"Updated project {_short(project.id)} ({project.name})")
+    except KeyboardInterrupt:
+        cli_exit_cancelled()
     except BaseException as exc:
         cli_exit(exc)
 
 
 @app.command
-async def delete(project_id: UUID) -> None:
-    """Delete a project (only when it has no time entries)."""
+async def delete(
+    project_id: Annotated[UUID | None, Parameter(help="Project UUID.")] = None,
+    *,
+    interactive: InteractiveOpt = False,
+) -> None:
+    """Delete a project when it has no entries. No args runs guided prompts."""
     try:
         await ensure_db()
-        await project_service.delete_project(project_id)
-        success(f"Deleted project {_short(project_id)}")
+        values = ProjectDeleteInput(project_id=project_id)
+        mode, missing = resolve_run_mode(
+            subcommand=("project", "delete"),
+            interactive_flag=interactive,
+            provided=values.as_provided(),
+            required_for_run=("project_id",),
+        )
+        if mode == RunMode.ERROR:
+            raise ValidationError(format_missing_fields(missing))
+        if mode == RunMode.INTERACTIVE:
+            values = await collect.collect_project_delete(values)
+            if values.cancelled:
+                cli_exit_cancelled()
+
+        pid = values.project_id
+        if pid is None:
+            raise ValidationError("Project is required.")
+        await project_service.delete_project(pid)
+        success(f"Deleted project {_short(pid)}")
+    except KeyboardInterrupt:
+        cli_exit_cancelled()
     except BaseException as exc:
         cli_exit(exc)
-
-
-def _parse_billing_mode(value: str) -> BillingMode:
-    normalized = value.strip().lower().replace("-", "_")
-    try:
-        return BillingMode(normalized)
-    except ValueError as exc:
-        from ttd.core.exceptions import ValidationError
-
-        raise ValidationError(
-            f"Invalid billing mode '{value}'; use hourly or fixed_price"
-        ) from exc
 
 
 def _short(project_id: UUID | None) -> str:

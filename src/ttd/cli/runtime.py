@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, time
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -12,6 +12,8 @@ from ttd.core.models.client import Client
 from ttd.core.models.project import Project
 from ttd.core.services import clients as client_service
 from ttd.core.services import projects as project_service
+from ttd.core.time import parse_clock_on_work_date
+from ttd.core.time import parse_work_date as parse_work_date_nl
 
 
 def require_id(value: UUID | None, label: str) -> UUID:
@@ -26,10 +28,7 @@ async def ensure_db() -> None:
 
 
 def parse_date(value: str) -> date:
-    try:
-        return date.fromisoformat(value)
-    except ValueError as exc:
-        raise ValidationError(f"Invalid date '{value}'; use YYYY-MM-DD") from exc
+    return parse_work_date_nl(value)
 
 
 def parse_decimal(value: str) -> Decimal:
@@ -40,18 +39,8 @@ def parse_decimal(value: str) -> Decimal:
 
 
 def parse_clock_on_date(work_date: date, clock: str) -> datetime:
-    """Parse HH:MM or HH:MM:SS on work_date as UTC."""
-    parts = clock.split(":")
-    if len(parts) not in (2, 3):
-        raise ValidationError(f"Invalid time '{clock}'; use HH:MM or HH:MM:SS")
-    try:
-        hour = int(parts[0])
-        minute = int(parts[1])
-        second = int(parts[2]) if len(parts) == 3 else 0
-        parsed_time = time(hour, minute, second)
-    except ValueError as exc:
-        raise ValidationError(f"Invalid time '{clock}'") from exc
-    return datetime.combine(work_date, parsed_time, tzinfo=UTC)
+    """Parse HH:MM or natural language clock text on work_date (stored as UTC)."""
+    return parse_clock_on_work_date(work_date, clock)
 
 
 async def resolve_client(*, client_id: UUID | None, client_name: str | None) -> Client:

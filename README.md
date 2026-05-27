@@ -25,6 +25,7 @@ uv run ttd
 
 | Command | Purpose |
 |---------|---------|
+| `just check` | Ruff lint/format check + ty (fast gate before PR or agent handoff) |
 | `just setup` | Install dependencies (`uv sync`) and git hooks (`uv run prek install`) |
 | `uv sync` | Install dependencies only |
 | `prek install` | Install git hooks only |

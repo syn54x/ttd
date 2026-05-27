@@ -98,6 +98,7 @@ M3 is next — export and period close build on the M1 ledger and M2 CLI dogfood
 - `ttd log` — retroactive entry by duration **or** time-in/out
 - `ttd entries` — list (filter by period/project), edit
 - CLI stays thin: parse → `await` core → format
+- Interactive capture on mutating commands (no args → guided prompts; `-i` fills missing fields; DB-backed pickers for existing entities) — see `plans/2026-05-26-004-feat-cli-interactive-capture-plan.md`
 - Dogfooding: at least one real client/project logged locally
 
 **Design constraint:** Optimize for **median time to log a retroactive entry**. Timer-first UX remains deferred (see After M8).

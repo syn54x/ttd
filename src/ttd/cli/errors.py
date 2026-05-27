@@ -6,6 +6,11 @@ from ttd.cli.console import error as print_error
 from ttd.core.exceptions import NotFoundError, TTDError, ValidationError
 
 
+def cli_exit_cancelled() -> None:
+    print_error("Cancelled.")
+    raise SystemExit(130)
+
+
 def cli_exit(exc: BaseException) -> None:
     if isinstance(exc, NotFoundError):
         print_error(str(exc))

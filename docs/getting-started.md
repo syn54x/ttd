@@ -13,10 +13,11 @@ Runs `uv sync` and `uv run prek install` (same as the README quick start).
 ## Checks
 
 ```bash
+just check
 prek run --all-files
 ```
 
-This runs ruff, ty, pytest (with coverage), and a Zensical docs build — the same hooks CI executes on every pull request and push to `main`.
+`just check` runs ruff and ty only (fast local gate). `prek run --all-files` also runs pytest (with coverage), Zensical docs build, and other hooks — the same full suite CI executes on every pull request and push to `main`.
 
 ## Demo data
 

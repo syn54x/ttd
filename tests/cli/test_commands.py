@@ -6,6 +6,7 @@ from uuid import UUID
 
 import pytest
 
+from ttd.cli.interactive import set_invocation_tokens
 from ttd.cli.main import app
 from ttd.core.db import close_db, init_db
 from ttd.core.services import time_entries as entry_service
@@ -25,6 +26,7 @@ def cli_db(cli_settings, reset_db_state):
 
 
 def run_cli(argv: list[str]) -> None:
+    set_invocation_tokens(argv)
     with pytest.raises(SystemExit) as exc_info:
         app(argv)
     assert exc_info.value.code == 0
@@ -84,6 +86,34 @@ def test_project_and_log_duration(cli_db, capsys) -> None:
     out = capsys.readouterr().out
     assert "2.50h" in out
     assert "API work" in out
+
+
+def test_log_interval_natural_language(cli_db, capsys) -> None:
+    run_cli(["client", "add", "Gamma", "--rate", "100"])
+    run_cli(
+        [
+            "project",
+            "add",
+            "--client",
+            "Gamma",
+            "--name",
+            "Support",
+        ]
+    )
+    run_cli(
+        [
+            "log",
+            "--client",
+            "Gamma",
+            "--project",
+            "Support",
+            "--when",
+            "2026-05-21 9am to 11:30am",
+        ]
+    )
+    out = capsys.readouterr().out
+    assert "09:00" in out
+    assert "11:30" in out
 
 
 def test_log_interval(cli_db, capsys) -> None:
