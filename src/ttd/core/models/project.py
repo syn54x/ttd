@@ -40,3 +40,6 @@ class Project(Model):
 
     soft_max_hours: Decimal | None = None
     """Informational effort threshold; logging is never blocked."""
+
+    rounding_increment_minutes: int | None = None
+    """Override client export rounding increment; unset inherits client."""

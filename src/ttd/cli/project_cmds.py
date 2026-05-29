@@ -15,6 +15,7 @@ from ttd.cli.interactive import RunMode, format_missing_fields, resolve_run_mode
 from ttd.cli.output import print_projects
 from ttd.cli.parameters import InteractiveOpt
 from ttd.cli.runtime import ensure_db, parse_decimal, require_id, resolve_client
+from ttd.cli.sort import PROJECT_SORTS, sort_items
 from ttd.core.exceptions import ValidationError
 from ttd.core.models.enums import BillingMode
 from ttd.core.schemas import CreateProject, UpdateProject
@@ -47,6 +48,10 @@ async def add(
     currency: Annotated[str | None, Parameter(name="--currency")] = None,
     contract_total: Annotated[str | None, Parameter(name="--contract-total")] = None,
     soft_max_hours: Annotated[str | None, Parameter(name="--soft-max-hours")] = None,
+    rounding_minutes: Annotated[
+        int | None,
+        Parameter(name="--rounding-minutes", help="Export round-up minutes."),
+    ] = None,
     interactive: InteractiveOpt = False,
 ) -> None:
     """Add a project. No args runs guided prompts; -i fills missing fields."""
@@ -96,6 +101,7 @@ async def add(
                     if values.soft_max_hours is not None
                     else None
                 ),
+                rounding_increment_minutes=rounding_minutes,
             )
         )
         success(f"Created project {_short(project.id)} ({project.name})")
@@ -110,6 +116,16 @@ async def list_projects(
     *,
     client: Annotated[str | None, Parameter(name="--client")] = None,
     client_id: Annotated[UUID | None, Parameter(name="--client-id")] = None,
+    sort: Annotated[
+        str | None,
+        Parameter(
+            name="--sort",
+            help=(
+                "Sort field; prefix with '-' for descending "
+                "(default: name). Fields: client, id, mode, name."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """List projects for a client."""
     try:
@@ -118,7 +134,14 @@ async def list_projects(
         projects = await project_service.list_projects_for_client(
             require_id(owner.id, "client")
         )
-        print_projects(projects)
+        print_projects(
+            sort_items(
+                projects,
+                allowed=PROJECT_SORTS,
+                sort=sort,
+                default="name",
+            )
+        )
     except BaseException as exc:
         cli_exit(exc)
 
@@ -134,6 +157,13 @@ async def update(
     soft_max_hours: Annotated[str | None, Parameter(name="--soft-max-hours")] = None,
     clear_rate_override: Annotated[
         bool, Parameter(name="--clear-rate-override")
+    ] = False,
+    rounding_minutes: Annotated[
+        int | None,
+        Parameter(name="--rounding-minutes", help="Export round-up minutes."),
+    ] = None,
+    clear_rounding: Annotated[
+        bool, Parameter(name="--clear-rounding", help="Remove rounding increment.")
     ] = False,
     interactive: InteractiveOpt = False,
 ) -> None:
@@ -179,6 +209,8 @@ async def update(
                     else None
                 ),
                 clear_rate_override=values.clear_rate_override,
+                rounding_increment_minutes=rounding_minutes,
+                clear_rounding_increment=clear_rounding,
             ),
         )
         success(f"Updated project {_short(project.id)} ({project.name})")

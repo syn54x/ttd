@@ -79,7 +79,7 @@ def print_entries(entries: list[TimeEntry]) -> None:
     table.add_column("Capture")
     table.add_column("Billable", no_wrap=True)
     table.add_column("Note", overflow="fold")
-    for entry in sorted(entries, key=lambda e: (e.work_date, e.id)):
+    for entry in entries:
         mode = enum_value(entry.entry_mode)
         if mode == "interval" and entry.started_at and entry.ended_at:
             span = (

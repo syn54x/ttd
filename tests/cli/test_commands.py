@@ -88,6 +88,35 @@ def test_project_and_log_duration(cli_db, capsys) -> None:
     assert "API work" in out
 
 
+def test_entries_list_default_sort_newest_first(cli_db, capsys) -> None:
+    run_cli(["client", "add", "Acme", "--rate", "150"])
+    run_cli(["project", "add", "--client", "Acme", "--name", "Website"])
+    for day, hours, note in [
+        ("2026-05-01", "1", "old"),
+        ("2026-05-20", "2", "new"),
+        ("2026-05-10", "3", "mid"),
+    ]:
+        run_cli(
+            [
+                "log",
+                "--client",
+                "Acme",
+                "--project",
+                "Website",
+                "--date",
+                day,
+                "--hours",
+                hours,
+                "--note",
+                note,
+            ]
+        )
+    capsys.readouterr()
+    run_cli(["entries", "list", "--client", "Acme", "--project", "Website"])
+    out = capsys.readouterr().out
+    assert out.index("new") < out.index("mid") < out.index("old")
+
+
 def test_log_interval_natural_language(cli_db, capsys) -> None:
     run_cli(["client", "add", "Gamma", "--rate", "100"])
     run_cli(

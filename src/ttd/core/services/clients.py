@@ -12,12 +12,19 @@ from ttd.core.models.project import Project
 from ttd.core.schemas import CreateClient, UpdateClient
 
 
+def _validate_rounding_minutes(value: int | None) -> None:
+    if value is not None and value <= 0:
+        raise ValidationError("rounding_increment_minutes must be a positive integer")
+
+
 async def create_client(data: CreateClient) -> Client:
+    _validate_rounding_minutes(data.rounding_increment_minutes)
     client = Client(
         id=uuid4(),
         name=data.name.strip(),
         default_hourly_rate=data.default_hourly_rate,
         currency=data.currency.upper(),
+        rounding_increment_minutes=data.rounding_increment_minutes,
     )
     await client.save()
     return client
@@ -42,6 +49,11 @@ async def update_client(client_id: UUID, data: UpdateClient) -> Client:
         client.default_hourly_rate = data.default_hourly_rate
     if data.currency is not None:
         client.currency = data.currency.upper()
+    if data.clear_rounding_increment:
+        client.rounding_increment_minutes = None
+    elif data.rounding_increment_minutes is not None:
+        _validate_rounding_minutes(data.rounding_increment_minutes)
+        client.rounding_increment_minutes = data.rounding_increment_minutes
     await client.save()
     return client
 

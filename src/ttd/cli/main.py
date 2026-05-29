@@ -1,7 +1,14 @@
 from cyclopts import App
 from rich.table import Table
 
-from ttd.cli import client_cmds, db_cmds, entries_cmds, log_cmds, project_cmds
+from ttd.cli import (
+    client_cmds,
+    db_cmds,
+    entries_cmds,
+    export_cmds,
+    log_cmds,
+    project_cmds,
+)
 from ttd.cli.console import stdout
 from ttd.core.services import health
 
@@ -12,6 +19,7 @@ app.command(client_cmds.app)
 app.command(project_cmds.app)
 app.command(log_cmds.app)
 app.command(entries_cmds.app)
+app.command(export_cmds.app)
 
 
 @app.default

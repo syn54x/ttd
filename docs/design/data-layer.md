@@ -43,8 +43,8 @@ Until then, **do not** add `alembic/` to the repo for routine M1 work.
 
 | Entity | Table | Notes |
 |--------|-------|--------|
-| `Client` | `client` | Default hourly rate + ISO 4217 currency |
-| `Project` | `project` | `billing_mode`: hourly or fixed_price; unique `(client_id, name)` |
+| `Client` | `client` | Default hourly rate + ISO 4217 currency; optional `rounding_increment_minutes` |
+| `Project` | `project` | `billing_mode`: hourly or fixed_price; unique `(client_id, name)`; optional rounding override |
 | `TimeEntry` | `time_entry` | Hours-canonical; duration vs interval modes |
 
 M1 uses scalar UUID FK columns (`client_id`, `project_id`) rather than ferro
@@ -90,6 +90,31 @@ models when the type is known to be `StrEnum`.
 
 Historical repro scripts: `docs/upstream/` (fail on ferro ≤ 0.10.3). Agents: see
 `.cursor/rules/ferro-upstream.mdc`.
+
+---
+
+## Export rounding (M3)
+
+- **`rounding_increment_minutes`** on `Client` and `Project` — positive integer minutes, or `null` for no rounding.
+- Project unset inherits the client value at export time (same pattern as hourly rates).
+- Rounding applies **at export only** via `round_hours_up` in `ttd.core.domain.rounding`; stored `billable_hours` are never modified.
+- Direction is **round up** to the next increment boundary.
+
+Configure via CLI: `ttd client add|update --rounding-minutes N`, `ttd project add|update --rounding-minutes N`, and `--clear-rounding` on update.
+
+---
+
+## Period CSV export (M3)
+
+- Service entrypoint: `export_period_csv` in `ttd.core.services.export`.
+- CLI: `ttd export --from YYYY-MM-DD --to YYYY-MM-DD` with optional `--client`, `--project`, `--project-id`, `--output`.
+- **CSV** (default): stdout when `--output` is omitted, or when `--output` ends with `.csv`. Combined detail + summary blocks as in M3.
+- **XLSX**: when `--output` ends with `.xlsx` — workbook with **Log** and **Summary** sheets; same column schemas as the CSV blocks (including `row_type`). Row 1 on each sheet is bold with a frozen pane and an unstyled Excel table (`headerRowCount=1`). Requires `--output` (no stdout). Best for Excel / Google Sheets.
+- **Numbers**: when `--output` ends with `.numbers` — native Apple Numbers workbook with the same **Log** / **Summary** sheets and columns; each table sets `num_header_rows=1` so Numbers opens with proper header rows. Requires `--output` (no stdout).
+- **Detail rows** (`row_type=DETAIL`): duration entries rolled up by project + work date + note; interval entries one row each with `time_from` / `time_to`.
+- **Summary rows** (`row_type=SUMMARY`): project and client subtotals for billable hours; dollar amounts for hourly projects only.
+- Hourly projects populate `currency`, `rate`, and `amount`; fixed-price projects export hours only.
+- Non-billable rows are included with `billable=no` and empty `amount`; dollar summaries exclude them.
 
 ---
 

@@ -25,6 +25,11 @@ from ttd.core.schemas import CreateProject, UpdateProject
 from ttd.core.services import clients as client_service
 
 
+def _validate_rounding_minutes(value: int | None) -> None:
+    if value is not None and value <= 0:
+        raise ValidationError("rounding_increment_minutes must be a positive integer")
+
+
 def _validate_hourly_override(
     hourly_rate: Decimal | None, currency: str | None
 ) -> None:
@@ -56,6 +61,8 @@ def _apply_create_fields(project: Project, data: CreateProject) -> None:
         project.currency = data.currency.upper()
         project.hourly_rate = None
     project.soft_max_hours = data.soft_max_hours
+    _validate_rounding_minutes(data.rounding_increment_minutes)
+    project.rounding_increment_minutes = data.rounding_increment_minutes
 
 
 async def create_project(data: CreateProject) -> Project:
@@ -122,6 +129,12 @@ async def update_project(project_id: UUID, data: UpdateProject) -> Project:
             project.contract_total = data.contract_total
         if data.currency is not None:
             project.currency = data.currency.upper()
+
+    if data.clear_rounding_increment:
+        project.rounding_increment_minutes = None
+    elif data.rounding_increment_minutes is not None:
+        _validate_rounding_minutes(data.rounding_increment_minutes)
+        project.rounding_increment_minutes = data.rounding_increment_minutes
 
     await project.save()
     return project

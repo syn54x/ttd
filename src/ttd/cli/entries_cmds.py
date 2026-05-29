@@ -24,6 +24,7 @@ from ttd.cli.runtime import (
     resolve_client,
     resolve_project,
 )
+from ttd.cli.sort import ENTRY_SORTS, sort_items
 from ttd.core.exceptions import ValidationError
 from ttd.core.models.enums import EntryMode
 from ttd.core.models.time_entry import TimeEntry
@@ -59,6 +60,16 @@ async def list_entries(
     to_date: Annotated[
         str | None, Parameter(name="--to", help="End date (YYYY-MM-DD).")
     ] = None,
+    sort: Annotated[
+        str | None,
+        Parameter(
+            name="--sort",
+            help=(
+                "Sort field; prefix with '-' for descending "
+                "(default: -date). Fields: billable, date, hours, id, project."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """List entries for a project, optionally filtered by work date."""
     try:
@@ -78,8 +89,16 @@ async def list_entries(
         )
         period_start = parse_date(from_date) if from_date is not None else None
         period_end = parse_date(to_date) if to_date is not None else None
+        filtered = _filter_by_period(
+            entries, from_date=period_start, to_date=period_end
+        )
         print_entries(
-            _filter_by_period(entries, from_date=period_start, to_date=period_end)
+            sort_items(
+                filtered,
+                allowed=ENTRY_SORTS,
+                sort=sort,
+                default="-date",
+            )
         )
     except BaseException as exc:
         cli_exit(exc)
