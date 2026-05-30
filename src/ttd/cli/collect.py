@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal, cast
 
 from ttd.cli import prompts
 from ttd.cli.inputs import (
     ClientAddInput,
     ClientDeleteInput,
     ClientUpdateInput,
+    ConfigInitInput,
     EntryDeleteInput,
     EntryEditInput,
     LogEntryInput,
@@ -334,3 +336,62 @@ async def collect_entry_delete(values: EntryDeleteInput) -> EntryDeleteInput:
     if not await confirm_delete(f"entry {label}"):
         values.cancelled = True
     return values
+
+
+async def collect_config_init(*, global_: bool) -> ConfigInitInput:
+    from ttd.core.config import (
+        config_file_has_settings,
+        config_target_path,
+        default_data_dir_path,
+        validate_config_value,
+    )
+
+    target = config_target_path(global_=global_)
+    if config_file_has_settings(target):
+        overwrite = await prompts.ask_confirm(
+            f"Config already exists at {target}. Overwrite all settings?",
+            default=False,
+        )
+        if not overwrite:
+            raise ValidationError("Cancelled; config file unchanged.")
+
+    data_dir = await prompts.ask_text(
+        "Data directory",
+        default=str(default_data_dir_path()),
+    )
+    while True:
+        try:
+            validate_config_value("data_dir", data_dir)
+            break
+        except ValidationError as exc:
+            data_dir = await prompts.ask_text(str(exc))
+
+    db_filename = await prompts.ask_text("Database filename", default="ttd.db")
+    while True:
+        try:
+            validate_config_value("db_filename", db_filename)
+            break
+        except ValidationError as exc:
+            db_filename = await prompts.ask_text(str(exc))
+
+    clock_format = await prompts.ask_select(
+        "Clock format",
+        [("24-hour", "24h"), ("12-hour", "12h")],
+    )
+
+    create_data_dir = await prompts.ask_confirm(
+        f"Create data directory {data_dir} if needed?",
+        default=True,
+    )
+    run_migrate = await prompts.ask_confirm(
+        "Apply database schema now?",
+        default=True,
+    )
+
+    return ConfigInitInput(
+        data_dir=data_dir,
+        db_filename=db_filename,
+        clock_format=cast(Literal["12h", "24h"], clock_format),
+        create_data_dir=create_data_dir,
+        run_migrate=run_migrate,
+    )

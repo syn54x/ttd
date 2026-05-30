@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from ttd.core.exceptions import ValidationError
@@ -215,3 +215,12 @@ class EntryDeleteInput:
 
     def as_provided(self) -> dict[str, Any]:
         return {"entry_id": self.entry_id}
+
+
+@dataclass(slots=True)
+class ConfigInitInput:
+    data_dir: str
+    db_filename: str
+    clock_format: Literal["12h", "24h"]
+    create_data_dir: bool = True
+    run_migrate: bool = False

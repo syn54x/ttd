@@ -24,7 +24,7 @@ Extends [general.md](general.md). Defines persistence conventions for the billin
 - `init_db()` imports `ttd.core.models` before `connect` so all `Model` subclasses register metadata.
 - `auto_migrate=True` creates or updates tables to match models.
 - **Tests:** each test uses an isolated `Settings(data_dir=tmp_path)` database; `reset_db_state` closes the engine between tests.
-- **Local dev:** if the on-disk `ttd.db` drifts after model changes, delete `~/.local/share/ttd/ttd.db` (or your `TTD_DATA_DIR`) and reconnect.
+- **Local dev:** if the on-disk `ttd.db` drifts after model changes, delete `~/.local/share/ttd/ttd.db` (or your configured `data_dir`) and reconnect.
 
 ### Pre–user-testing: Alembic cutover (deferred)
 
@@ -36,6 +36,54 @@ When the schema stabilizes (e.g. before M2 dogfooding / external testers):
 4. Decide whether tests keep `auto_migrate` on tmp DBs or run `upgrade head` — either is fine if CI is consistent.
 
 Until then, **do not** add `alembic/` to the repo for routine M1 work.
+
+---
+
+## Configuration (M4)
+
+Layered TOML + env vars feed a single `Settings` object via `get_settings()`. All DB paths and future display prefs use this path.
+
+### Files and discovery
+
+| Layer | Path | Notes |
+|-------|------|--------|
+| **Global** | `{XDG_CONFIG_HOME}/ttd/ttd.toml` (default `~/.config/ttd/ttd.toml`) | Created on first `ttd config set --global …` |
+| **Local** | Nearest `ttd.toml` walking up from cwd to filesystem root | First match wins; no merge of ancestor files |
+| **Env** | `TTD_*` variables (and optional cwd `.env`) | Highest precedence |
+
+### Precedence (highest first)
+
+1. `TTD_*` environment variables (including values loaded from `.env`)
+2. Local `ttd.toml`
+3. Global `ttd.toml`
+4. Built-in defaults
+
+### v1 keys
+
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `data_dir` | `~/.local/share/ttd` | SQLite directory (created on first use when default) |
+| `db_filename` | `ttd.db` | Database file name within `data_dir` |
+| `clock_format` | `24h` | `12h` or `24h`; stored only in M4 |
+
+Paths in TOML are expanded and resolved on read. Unknown keys in existing files (e.g. legacy `timezone`) are ignored.
+
+### CLI
+
+```bash
+ttd config show              # key, effective value, source layer + file paths
+ttd config init              # interactive first-run setup (writes global file)
+ttd config init --local      # write ./ttd.toml instead
+ttd config get data_dir      # scriptable single-line output
+ttd config set data_dir /path/to/data
+ttd config set --global clock_format 24h
+```
+
+`config set` writes the **local** file in cwd when no ancestor `ttd.toml` exists; use `--global` for the XDG config file. After changing `data_dir`, run `ttd db where` (and `ttd db migrate` if needed) in a fresh invocation.
+
+### Tests
+
+Config tests monkeypatch `XDG_CONFIG_HOME` and cwd; service tests continue to inject `Settings(data_dir=tmp_path)` directly — unchanged.
 
 ---
 

@@ -37,6 +37,40 @@ uv run ttd
 | `uv run ttd-api` | Litestar API (scaffold) |
 | `uv run ttd-tui` | Textual TUI (scaffold) |
 
+## Period export
+
+Close a billing period to CSV (default), XLSX, or Numbers. Format is inferred from `--output`; omit it to print CSV to stdout.
+
+```bash
+# CSV to stdout
+ttd export --from 2026-05-01 --to 2026-05-31
+
+# CSV, XLSX, or Numbers file
+ttd export --from 5/1 --to 5/31 --output period.csv
+ttd export --from 5/1 --to 5/31 --client Acme --output period.xlsx
+ttd export --from 5/1 --to 5/31 --output period.numbers
+
+# Optional export-time round-up (minutes); set on client or project
+ttd client add Acme --rate 150 --rounding-minutes 15
+ttd project update --client Acme --name Website --rounding-minutes 30
+```
+
+Detail rows roll up duration entries by project, day, and note; interval entries stay one row each. A summary section (same file or Summary sheet) totals billable hours and hourly dollars by project and client. See [docs/design/data-layer.md](docs/design/data-layer.md) for column schemas.
+
+## Configuration
+
+Persistent settings live in layered TOML files plus optional `TTD_*` env overrides. Inspect effective values and source layers with `ttd config show`; set local or global keys with `ttd config set`.
+
+```bash
+ttd config show
+ttd config init
+ttd config set data_dir ~/.local/share/ttd
+ttd config set --global clock_format 24h
+ttd config get db_filename
+```
+
+Global file: `~/.config/ttd/ttd.toml`. Local override: nearest `ttd.toml` walking up from cwd. Precedence: env → local → global → defaults. See [docs/design/data-layer.md](docs/design/data-layer.md#configuration-m4).
+
 ## Release (maintainers)
 
 ### One-time setup

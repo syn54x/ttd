@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Sequence
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import questionary
 from questionary import Choice
@@ -36,14 +36,26 @@ async def ask_confirm(message: str, *, default: bool = False) -> bool:
     return bool(await to_thread(_run))
 
 
-async def ask_select[T](message: str, choices: Sequence[tuple[str, T]]) -> T:
+async def ask_select[T](
+    message: str,
+    choices: Sequence[tuple[str, T]],
+    *,
+    use_search_filter: bool = False,
+    default: T | None = None,
+) -> T:
     if not choices:
         raise ValueError("ask_select requires at least one choice")
 
     def _run() -> T:
+        kwargs: dict[str, Any] = {"use_search_filter": use_search_filter}
+        if use_search_filter:
+            kwargs["use_jk_keys"] = False
+        if default is not None:
+            kwargs["default"] = cast(Any, default)
         picked = questionary.select(
             message,
             choices=[Choice(title=label, value=value) for label, value in choices],
+            **kwargs,
         ).unsafe_ask()
         if picked is None:
             raise KeyboardInterrupt

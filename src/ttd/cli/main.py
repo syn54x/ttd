@@ -3,6 +3,7 @@ from rich.table import Table
 
 from ttd.cli import (
     client_cmds,
+    config_cmds,
     db_cmds,
     entries_cmds,
     export_cmds,
@@ -15,6 +16,7 @@ from ttd.core.services import health
 app = App(name="ttd", help="Terminal-native billable ledger.")
 
 app.command(db_cmds.app)
+app.command(config_cmds.app)
 app.command(client_cmds.app)
 app.command(project_cmds.app)
 app.command(log_cmds.app)

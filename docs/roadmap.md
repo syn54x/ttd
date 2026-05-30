@@ -1,13 +1,13 @@
 ---
 title: Roadmap
-last_updated: 2026-05-25
+last_updated: 2026-05-29
 ---
 
 # Roadmap
 
 This document sequences **when** TTD ships capability. [STRATEGY.md](https://github.com/syn54x/ttd/blob/main/STRATEGY.md) defines **why** and **what tracks** matter; individual features get requirements in `brainstorms/` and implementation plans in `plans/` (repo root — excluded from the docs site build) before code lands.
 
-**Product goal:** Replace the spreadsheet + manual invoice assembly loop for a solo developer billing hourly. **M1–M4** deliver the CLI ledger and CSV period close; **M5–M7** add TUI, client-ready invoice formats, and API; **M8** is the first public release. Success is measured by the metrics in `STRATEGY.md`.
+**Product goal:** Replace the spreadsheet + manual invoice assembly loop for a solo developer billing hourly. **M1–M4** deliver the CLI ledger, period export, and layered TOML configuration; **M5–M8** add data trust, TUI, client-ready invoice formats, and API; **M9** is the first public release. Success is measured by the metrics in `STRATEGY.md`.
 
 ---
 
@@ -18,26 +18,28 @@ This document sequences **when** TTD ships capability. [STRATEGY.md](https://git
 | M0 | Foundation | **Done** |
 | M1 | Billing ledger (core) | **Done** |
 | M2 | Terminal capture (CLI) | **Done** |
-| M3 | Export & period close (CSV) | Next |
-| M4 | Data trust & hardening | Planned |
-| M5 | TUI | Planned |
-| M6 | PDF / Markdown invoices | Planned |
-| M7 | API | Planned |
-| M8 | Public release | Planned |
+| M3 | Export & period close (CSV) | **Done** |
+| M4 | Configuration (TOML + CLI) | Next |
+| M5 | Data trust & hardening | Planned |
+| M6 | TUI | Planned |
+| M7 | PDF / Markdown invoices | Planned |
+| M8 | API | Planned |
+| M9 | Public release | Planned |
 
 ```mermaid
 flowchart LR
     M0[M0 Foundation] --> M1[M1 Ledger]
     M1 --> M2[M2 CLI]
-    M2 --> M3[M3 CSV export]
-    M3 --> M4[M4 Trust]
-    M4 --> M5[M5 TUI]
-    M5 --> M6[M6 Invoices]
-    M6 --> M7[M7 API]
-    M7 --> M8[M8 Release]
+    M2 --> M3[M3 Export]
+    M3 --> M4[M4 Config]
+    M4 --> M5[M5 Trust]
+    M5 --> M6[M6 TUI]
+    M6 --> M7[M7 Invoices]
+    M7 --> M8[M8 API]
+    M8 --> M9[M9 Release]
 ```
 
-M3 is next — export and period close build on the M1 ledger and M2 CLI dogfooding. **M5–M7** are thin surfaces and export formats over the same core — no duplicate domain logic.
+M4 is next — layered TOML configuration and `ttd config` before data-trust hardening. **M6–M8** are thin surfaces and export formats over the same core — no duplicate domain logic.
 
 ---
 
@@ -113,13 +115,16 @@ M3 is next — export and period close build on the M1 ledger and M2 CLI dogfood
 
 **Outcome:** A billing period closes to CSV totals you trust enough to invoice from — no second assembly step for tabular export.
 
-**Ship when:**
+**Delivered:**
 
-- Billing period definition (calendar month to start; extensibility deferred unless requirements demand it)
-- Global rounding rule applied at export time
-- Period totals by client and project
-- CSV export suitable for invoicing (shape defined in requirements)
-- Duration and interval entries bill the same way
+- `ttd export --from` / `--to` with optional `--client`, `--project`, `--project-id`, `--output`
+- Export-time round-up via `rounding_increment_minutes` on clients and projects (`--rounding-minutes` CLI)
+- Duration rollup by project + work date + note; interval entries one row each
+- Combined CSV: detail rows + summary totals (client and project subtotals)
+- Optional **XLSX** (Log + Summary sheets) and **Numbers** (native header rows) via `--output` extension
+- Core service: `export_period_csv` / `export_period_xlsx` / `export_period_numbers` in `ttd.core.services.export`
+
+**Plan:** `plans/2026-05-25-003-feat-export-period-close-plan.md`
 
 **Not in M3:** PDF/Markdown invoices (M6), TUI/API product routes (M5–M7)
 
@@ -127,7 +132,29 @@ M3 is next — export and period close build on the M1 ledger and M2 CLI dogfood
 
 ---
 
-## M4 — Data trust & hardening
+## M4 — Configuration (TOML + CLI)
+
+**Track:** Terminal-first capture (machine prefs)
+
+**Outcome:** Machine and optional per-repo settings live in TOML files with a scriptable CLI — no hand-editing or permanent env exports for common prefs.
+
+**Ship when:**
+
+- Global config at `{XDG_CONFIG_HOME}/ttd/ttd.toml`; local override via nearest `ttd.toml` (walk up from cwd)
+- Precedence: `TTD_*` env → local TOML → global TOML → defaults
+- `ttd config show|get|set` (local write by default; `--global` for global file)
+- pydantic-settings `Settings` loads layered TOML; v1 keys: `data_dir`, `db_filename`, `clock_format`
+- `ttd db *` and DB init use the same `get_settings()` source
+
+**Not in M4:** Consuming clock prefs in log/list (follow-up); API/TUI config UI
+
+**Requirements:** `brainstorms/2026-05-29-config-toml-requirements.md`
+
+**Depends on:** M0–M3
+
+---
+
+## M5 — Data trust & hardening
 
 **Track:** Data trust & portability
 
@@ -141,11 +168,11 @@ M3 is next — export and period close build on the M1 ledger and M2 CLI dogfood
 - pytest coverage `fail_under` enabled for billing-critical modules
 - Hypothesis property tests for rounding and hour calculations
 
-**Depends on:** M1–M3 (trust features wrap real ledger + export behavior)
+**Depends on:** M1–M4 (trust features wrap real ledger, export, and config)
 
 ---
 
-## M5 — TUI
+## M6 — TUI
 
 **Track:** Terminal-first capture (visual surface)
 
@@ -160,11 +187,11 @@ M3 is next — export and period close build on the M1 ledger and M2 CLI dogfood
 
 **Not in M5:** Timer-first UX, rich analytics dashboards
 
-**Depends on:** M1–M4 (stable core + CSV export to display)
+**Depends on:** M1–M5 (stable core, export, and config)
 
 ---
 
-## M6 — PDF / Markdown invoices
+## M7 — PDF / Markdown invoices
 
 **Track:** Export & billing rules
 
@@ -177,11 +204,11 @@ M3 is next — export and period close build on the M1 ledger and M2 CLI dogfood
 - Global rounding and rate rules from M3 apply identically
 - Formatting and layout logic lives in `ttd.core` (export services); CLI/TUI/API only trigger export and deliver files
 
-**Depends on:** M3 (export engine); M4 recommended for export trust
+**Depends on:** M3 (export engine); M5 recommended for export trust
 
 ---
 
-## M7 — API
+## M8 — API
 
 **Track:** Enabler for integrations (thin surface over core)
 
@@ -196,11 +223,11 @@ M3 is next — export and period close build on the M1 ledger and M2 CLI dogfood
 
 **Not in M7:** Public multi-tenant hosting, cloud sync
 
-**Depends on:** M1–M6 (API exposes what core already does)
+**Depends on:** M1–M7 (API exposes what core already does)
 
 ---
 
-## M8 — Public release
+## M9 — Public release
 
 **Outcome:** TTD is installable, documented, and shippable as a complete solo-dev billing product (CLI + TUI + API + CSV + invoices).
 
@@ -211,11 +238,11 @@ M3 is next — export and period close build on the M1 ledger and M2 CLI dogfood
 - GitHub branch protection + PyPI trusted publishing verified
 - Maintainer runbook exercised once end-to-end
 
-**Depends on:** M2–M7 (M1 is implicit); dogfood at least one full billing period through M6 before tagging
+**Depends on:** M2–M8 (M1 is implicit); dogfood at least one full billing period through M7 before tagging
 
 ---
 
-## After M8 (not scheduled)
+## After M9 (not scheduled)
 
 Deferred past the first public release. Tracks exist; sequencing TBD after dogfooding:
 
@@ -235,14 +262,14 @@ For each milestone (starting with **M1**):
 
 1. **Brainstorm** — `brainstorms/YYYY-MM-DD-<topic>-requirements.md`
 2. **Plan** — `plans/YYYY-MM-DD-<n>-feat-<topic>-plan.md`
-3. **Implement** — core first, then the surface for that milestone (CLI M2, TUI M5, export formats M6, API M7)
+3. **Implement** — core first, then the surface for that milestone (CLI M2, config M4, TUI M6, export formats M7, API M8)
 4. **Compound** — capture pitfalls in `docs/solutions/` when something non-obvious is learned
 
 ---
 
 ## Operational checklist (ongoing)
 
-Land before or with **M8**:
+Land before or with **M9**:
 
 - [ ] GitHub branch protection (require CI on PRs)
 - [x] PyPI package name confirmed (`ttd-ledger`; CLI `ttd`)
