@@ -24,3 +24,6 @@ class Client(Model):
 
     currency: Annotated[str, FerroField(db_type=varchar(3))]
     """ISO 4217 currency code (e.g. USD)."""
+
+    rounding_increment_minutes: int | None = None
+    """Export-time round-up increment in minutes; unset means no rounding."""

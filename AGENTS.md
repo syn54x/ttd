@@ -7,15 +7,26 @@ TTD is a terminal-native billable ledger. Read `STRATEGY.md` for product scope b
 - `src/ttd/core/` — async domain services and persistence; **all business logic here**
 - `src/ttd/cli/`, `api/`, `tui/` — thin adapters only (parse → call core → format); CLI output uses **Rich** (`ttd.cli.console`, `ttd.cli.output`)
 - `tests/` — pytest; mirror `core` structure for service tests
+- `docs/solutions/` — documented solutions to past problems (bugs, patterns, workflow), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`); relevant when implementing or debugging in documented areas
 
 ## Commands
 
 ```bash
 uv sync
+just check             # ruff + ty (required before finishing agent work)
 prek run --all-files   # full check suite (CI parity)
 uv run pytest
 uv run ttd
 ```
+
+**Done means green:** run `just check` and fix failures before handoff. See `.cursor/rules/quality-gate.mdc`.
+
+## Dependency management (uv)
+
+- Use **uv**, not `pip install` / ad-hoc virtualenvs.
+- **One-off inline scripts**: prefer `uv run --with <pkg> python -c "..."` (add `--no-project` if you want an isolated ephemeral env).
+- **Project deps**: update `pyproject.toml` via `uv add <pkg>` (or `uv remove <pkg>`), then `uv sync`.
+- If you need to test something against the project environment, prefer `uv run ...` over invoking `python` directly.
 
 ## Design standards
 

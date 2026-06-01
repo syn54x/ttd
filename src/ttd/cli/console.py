@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from rich.console import Console
+from rich.console import Console, RenderableType
 
 stdout = Console()
 stderr = Console(stderr=True)
@@ -13,8 +13,8 @@ def success(message: str) -> None:
     stdout.print(f"[green]✓[/green] {message}")
 
 
-def info(message: str) -> None:
-    """Print a neutral informational line to stdout."""
+def info(message: RenderableType) -> None:
+    """Print neutral informational output (text or Rich renderables)."""
     stdout.print(message)
 
 

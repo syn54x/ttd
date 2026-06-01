@@ -8,9 +8,13 @@ from uuid import UUID
 
 from cyclopts import App, Parameter
 
+from ttd.cli import collect
 from ttd.cli.console import info, success
-from ttd.cli.errors import cli_exit
+from ttd.cli.errors import cli_exit, cli_exit_cancelled
+from ttd.cli.inputs import EntryDeleteInput, EntryEditInput, billable_flag
+from ttd.cli.interactive import RunMode, format_missing_fields, resolve_run_mode
 from ttd.cli.output import print_entries, print_entry
+from ttd.cli.parameters import InteractiveOpt
 from ttd.cli.runtime import (
     ensure_db,
     parse_clock_on_date,
@@ -20,6 +24,8 @@ from ttd.cli.runtime import (
     resolve_client,
     resolve_project,
 )
+from ttd.cli.sort import ENTRY_SORTS, sort_items
+from ttd.core.exceptions import ValidationError
 from ttd.core.models.enums import EntryMode
 from ttd.core.models.time_entry import TimeEntry
 from ttd.core.schemas import UpdateDurationEntry, UpdateIntervalEntry
@@ -54,6 +60,16 @@ async def list_entries(
     to_date: Annotated[
         str | None, Parameter(name="--to", help="End date (YYYY-MM-DD).")
     ] = None,
+    sort: Annotated[
+        str | None,
+        Parameter(
+            name="--sort",
+            help=(
+                "Sort field; prefix with '-' for descending "
+                "(default: -date). Fields: billable, date, hours, id, project."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """List entries for a project, optionally filtered by work date."""
     try:
@@ -73,8 +89,16 @@ async def list_entries(
         )
         period_start = parse_date(from_date) if from_date is not None else None
         period_end = parse_date(to_date) if to_date is not None else None
+        filtered = _filter_by_period(
+            entries, from_date=period_start, to_date=period_end
+        )
         print_entries(
-            _filter_by_period(entries, from_date=period_start, to_date=period_end)
+            sort_items(
+                filtered,
+                allowed=ENTRY_SORTS,
+                sort=sort,
+                default="-date",
+            )
         )
     except BaseException as exc:
         cli_exit(exc)
@@ -82,7 +106,7 @@ async def list_entries(
 
 @app.command
 async def edit(
-    entry_id: UUID,
+    entry_id: Annotated[UUID | None, Parameter(help="Entry UUID.")] = None,
     *,
     work_date: Annotated[str | None, Parameter(name="--date")] = None,
     hours: Annotated[str | None, Parameter(name="--hours")] = None,
@@ -91,74 +115,115 @@ async def edit(
     note: str | None = None,
     non_billable: Annotated[bool | None, Parameter(name="--no-billable")] = None,
     billable: Annotated[bool | None, Parameter(name="--billable")] = None,
+    interactive: InteractiveOpt = False,
 ) -> None:
-    """Edit a time entry (fields depend on duration vs interval mode)."""
+    """Edit a time entry. No args runs guided prompts."""
     try:
         await ensure_db()
-        entry = await entry_service.get_time_entry(entry_id)
-        if non_billable is True and billable is not None:
-            from ttd.core.exceptions import ValidationError
+        values = EntryEditInput(
+            entry_id=entry_id,
+            work_date=work_date,
+            hours=hours,
+            time_from=time_from,
+            time_to=time_to,
+            note=note,
+            non_billable=non_billable,
+            billable=billable,
+        )
+        mode, missing = resolve_run_mode(
+            subcommand=("entries", "edit"),
+            interactive_flag=interactive,
+            provided=values.as_provided(),
+            required_for_run=(),
+        )
+        if mode == RunMode.ERROR:
+            raise ValidationError(format_missing_fields(missing))
+        if mode == RunMode.INTERACTIVE:
+            values = await collect.collect_entry_edit(values)
 
-            raise ValidationError("Use only one of --billable or --no-billable")
-        billable_flag: bool | None = None
-        if non_billable is True:
-            billable_flag = False
-        elif billable is not None:
-            billable_flag = billable
+        entry_id_val = values.require_entry_id()
+        entry = await entry_service.get_time_entry(entry_id_val)
+        billable_flag_val = billable_flag(
+            non_billable=values.non_billable,
+            billable=values.billable,
+        )
 
-        day = parse_date(work_date) if work_date is not None else None
+        day = parse_date(values.work_date) if values.work_date is not None else None
 
         if entry.entry_mode == EntryMode.DURATION:
-            if time_from is not None or time_to is not None:
-                from ttd.core.exceptions import ValidationError
-
+            if values.time_from is not None or values.time_to is not None:
                 raise ValidationError("Duration entries use --hours, not --from/--to")
             updated = await entry_service.update_duration_entry(
-                entry_id,
+                entry_id_val,
                 UpdateDurationEntry(
                     work_date=day,
-                    billable_hours=parse_decimal(hours) if hours else None,
-                    billable=billable_flag,
-                    note=note,
+                    billable_hours=(
+                        parse_decimal(values.hours) if values.hours else None
+                    ),
+                    billable=billable_flag_val,
+                    note=values.note,
                 ),
             )
         else:
-            if hours is not None:
-                from ttd.core.exceptions import ValidationError
-
+            if values.hours is not None:
                 raise ValidationError("Interval entries use --from/--to, not --hours")
             started = (
-                parse_clock_on_date(day or entry.work_date, time_from)
-                if time_from
+                parse_clock_on_date(day or entry.work_date, values.time_from)
+                if values.time_from
                 else None
             )
             ended = (
-                parse_clock_on_date(day or entry.work_date, time_to)
-                if time_to
+                parse_clock_on_date(day or entry.work_date, values.time_to)
+                if values.time_to
                 else None
             )
             updated = await entry_service.update_interval_entry(
-                entry_id,
+                entry_id_val,
                 UpdateIntervalEntry(
                     work_date=day,
                     started_at=started,
                     ended_at=ended,
-                    billable=billable_flag,
-                    note=note,
+                    billable=billable_flag_val,
+                    note=values.note,
                 ),
             )
         info("Updated entry:")
         print_entry(updated)
+    except KeyboardInterrupt:
+        cli_exit_cancelled()
     except BaseException as exc:
         cli_exit(exc)
 
 
 @app.command
-async def delete(entry_id: UUID) -> None:
-    """Delete a time entry."""
+async def delete(
+    entry_id: Annotated[UUID | None, Parameter(help="Entry UUID.")] = None,
+    *,
+    interactive: InteractiveOpt = False,
+) -> None:
+    """Delete a time entry. No args runs guided prompts."""
     try:
         await ensure_db()
-        await entry_service.delete_time_entry(entry_id)
-        success(f"Deleted entry {str(entry_id)[:8]}")
+        values = EntryDeleteInput(entry_id=entry_id)
+        mode, missing = resolve_run_mode(
+            subcommand=("entries", "delete"),
+            interactive_flag=interactive,
+            provided=values.as_provided(),
+            required_for_run=("entry_id",),
+        )
+        if mode == RunMode.ERROR:
+            raise ValidationError(format_missing_fields(missing))
+        if mode == RunMode.INTERACTIVE:
+            values = await collect.collect_entry_delete(values)
+            if values.cancelled:
+                cli_exit_cancelled()
+
+        eid = values.entry_id
+        if eid is None:
+            raise ValidationError("Entry is required.")
+        await entry_service.delete_time_entry(eid)
+        success(f"Deleted entry {str(eid)[:8]}")
+    except KeyboardInterrupt:
+        cli_exit_cancelled()
     except BaseException as exc:
         cli_exit(exc)

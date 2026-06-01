@@ -1,0 +1,35 @@
+---
+description: Require just check before finishing agent work
+globs: "**/*"
+alwaysApply: true
+---
+
+# Quality gate (TTD)
+
+Agent work is **not done** until **`just check`** passes in the repo root.
+
+## Required before handoff
+
+```bash
+just check
+```
+
+This runs:
+
+- `uv run ruff check .`
+- `uv run ruff format --check .`
+- `uv run ty check`
+
+Fix any reported issues (or narrow the change scope) and re-run until exit code 0.
+
+## When to run more
+
+| Command | When |
+|---------|------|
+| `just check` | Default gate after code changes |
+| `uv run pytest` | Behavior or logic changed |
+| `prek run --all-files` | Pre-PR / CI parity (hooks include pytest, docs build, etc.) |
+
+Git hooks installed via `just setup` / `uv run prek install` also run ruff and ty on commit (see `prek.toml`).
+
+Do not claim a task is complete, ready for review, or passing CI if `just check` has not been run successfully on the current tree.

@@ -14,3 +14,9 @@ build/
 site/
 *.db
 *.db-*
+
+# Local env and ad-hoc exports
+.envrc
+*.csv
+*.xlsx
+*.numbers

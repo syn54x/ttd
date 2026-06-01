@@ -1,6 +1,6 @@
 import pytest
 
-from ttd.core.config import Settings
+from ttd.core.config import Settings, clear_settings_cache
 from ttd.core.db import close_db, init_db
 from ttd.core.models.client import Client
 from ttd.core.models.enums import BillingMode
@@ -8,6 +8,19 @@ from ttd.core.models.project import Project
 from ttd.core.schemas import CreateClient, CreateProject
 from ttd.core.services import clients as client_service
 from ttd.core.services import projects as project_service
+
+
+@pytest.fixture(autouse=True)
+def isolate_app_config(monkeypatch, tmp_path) -> None:
+    """Keep layered TOML/env config from the developer machine out of tests."""
+    xdg = tmp_path / "xdg-config"
+    xdg.mkdir(exist_ok=True)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
+    for var in ("TTD_DATA_DIR", "TTD_DB_FILENAME", "TTD_CLOCK_FORMAT"):
+        monkeypatch.delenv(var, raising=False)
+    clear_settings_cache()
+    yield
+    clear_settings_cache()
 
 
 @pytest.fixture

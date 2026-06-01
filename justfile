@@ -5,6 +5,12 @@ set dotenv-load := true
 default:
     @just --list
 
+# Lint and type-check (ruff + ty). Run before considering agent work done.
+check:
+    uv run ruff check .
+    uv run ruff format --check .
+    uv run ty check
+
 # Install Python deps (uv) and git hooks (prek via uv).
 setup:
     uv sync

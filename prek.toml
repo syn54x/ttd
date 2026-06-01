@@ -8,6 +8,8 @@ hooks = [
   { id = "check-toml" },
 ]
 
+# Local hooks run on `git commit` after `uv run prek install` (see just setup).
+# `just check` mirrors ruff + ty only; `prek run --all-files` is full CI parity.
 [[repos]]
 repo = "local"
 hooks = [

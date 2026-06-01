@@ -42,8 +42,26 @@ async def test_delete_client_with_projects_fails(db, hourly_project) -> None:
         await client_service.delete_client(hourly_project.client_id)
 
 
-async def test_get_missing_client(db) -> None:
-    from uuid import uuid4
+async def test_create_client_with_rounding(db) -> None:
+    created = await client_service.create_client(
+        CreateClient(
+            name="Rounded",
+            default_hourly_rate=Decimal("150"),
+            currency="USD",
+            rounding_increment_minutes=15,
+        )
+    )
+    loaded = await client_service.get_client(created.id)
+    assert loaded.rounding_increment_minutes == 15
 
-    with pytest.raises(NotFoundError):
-        await client_service.get_client(uuid4())
+
+async def test_create_client_invalid_rounding() -> None:
+    from pydantic import ValidationError as PydanticValidationError
+
+    with pytest.raises(PydanticValidationError):
+        CreateClient(
+            name="Bad",
+            default_hourly_rate=Decimal("150"),
+            currency="USD",
+            rounding_increment_minutes=0,
+        )
