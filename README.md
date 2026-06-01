@@ -110,7 +110,24 @@ Builds the wheel/sdist and runs `ttd --help` from the artifact (same layout CI p
 
    Watch progress: `gh run watch --workflow release.yml`
 
-4. Smoke test after publish:
+### Failed publish recovery
+
+If PyPI rejects the upload (for example **filename reuse** after a deleted version), `main` may already have the bump commit and tag while PyPI has nothing:
+
+1. Bump to a **new** version (PyPI never reuses deleted filenames).
+2. Update `CHANGELOG.md` for that version.
+3. Delete stray or failed tags (`git push origin :refs/tags/v0.x.y`).
+4. Push `main`, tag the recovery version, push the tag.
+5. Re-run the workflow with **publish only** (skips `cz bump`):
+
+   ```bash
+   gh workflow run release.yml --ref main -f publish_only=true
+   gh run watch --workflow release.yml
+   ```
+
+Also delete accidental non-semver tags (e.g. `list`) — they break `git describe` and commitizen.
+
+### Smoke test after publish
 
    ```bash
    uvx ttd-ledger --help

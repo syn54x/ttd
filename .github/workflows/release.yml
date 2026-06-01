@@ -2,6 +2,11 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_only:
+        description: Skip cz bump; publish current version on main (failed-publish recovery)
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -38,7 +43,36 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Bump version and changelog
+        if: ${{ !inputs.publish_only }}
         run: uv run cz bump --yes --check-consistency --changelog --changelog-to-stdout > release-body.md
+
+      - name: Prepare release body (publish-only recovery)
+        if: ${{ inputs.publish_only }}
+        run: |
+          python3 - <<'EOF'
+          import re
+          import sys
+          from pathlib import Path
+
+          version = re.search(
+              r'^version = "([^"]+)"',
+              Path("pyproject.toml").read_text(),
+              re.MULTILINE,
+          )
+          if not version:
+              sys.exit("missing [project].version in pyproject.toml")
+          version = version.group(1)
+          changelog = Path("CHANGELOG.md").read_text()
+          match = re.search(
+              rf"^## v{re.escape(version)} \(.*?\)\n(?P<body>(?:\n(?!## ).*)*)",
+              changelog,
+              re.MULTILINE,
+          )
+          if not match:
+              sys.exit(f"no CHANGELOG section for v{version}")
+          Path("release-body.md").write_text(match.group("body").strip() + "\n")
+          print(f"release body ok for v{version}")
+          EOF
 
       - name: Verify release body
         run: test -s release-body.md
@@ -57,7 +91,7 @@ jobs:
               sys.exit("missing [project].version in pyproject.toml")
           project_version = match.group(1)
           tag = subprocess.check_output(
-              ["git", "describe", "--tags", "--abbrev=0"], text=True
+              ["git", "describe", "--tags", "--abbrev=0", "--match", "v*"], text=True
           ).strip().removeprefix("v")
           if project_version != tag:
               sys.exit(
@@ -67,8 +101,9 @@ jobs:
           EOF
 
       - name: Push release commit and tag
+        if: ${{ !inputs.publish_only }}
         run: |
-          TAG=$(git describe --tags --abbrev=0)
+          TAG=$(git describe --tags --abbrev=0 --match 'v*')
           git push origin main
           git push origin "${TAG}"
 
@@ -82,7 +117,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG=$(git describe --tags --abbrev=0)
+          TAG=$(git describe --tags --abbrev=0 --match 'v*')
           gh release create "${TAG}" \
             --title "${TAG}" \
             --notes-file release-body.md \
