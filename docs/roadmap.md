@@ -19,8 +19,8 @@ This document sequences **when** TTD ships capability. [STRATEGY.md](https://git
 | M1 | Billing ledger (core) | **Done** |
 | M2 | Terminal capture (CLI) | **Done** |
 | M3 | Export & period close (CSV) | **Done** |
-| M4 | Configuration (TOML + CLI) | Next |
-| M5 | Data trust & hardening | Planned |
+| M4 | Configuration (TOML + CLI) | **Done** |
+| M5 | Data trust & hardening | Next |
 | M6 | TUI | Planned |
 | M7 | PDF / Markdown invoices | Planned |
 | M8 | API | Planned |
@@ -39,7 +39,7 @@ flowchart LR
     M8 --> M9[M9 Release]
 ```
 
-M4 is next — layered TOML configuration and `ttd config` before data-trust hardening. **M6–M8** are thin surfaces and export formats over the same core — no duplicate domain logic.
+M5 is next — data trust and hardening after export and layered config are in place. **M6–M8** are thin surfaces and export formats over the same core — no duplicate domain logic.
 
 ---
 
@@ -138,17 +138,17 @@ M4 is next — layered TOML configuration and `ttd config` before data-trust har
 
 **Outcome:** Machine and optional per-repo settings live in TOML files with a scriptable CLI — no hand-editing or permanent env exports for common prefs.
 
-**Ship when:**
+**Delivered:**
 
 - Global config at `{XDG_CONFIG_HOME}/ttd/ttd.toml`; local override via nearest `ttd.toml` (walk up from cwd)
 - Precedence: `TTD_*` env → local TOML → global TOML → defaults
-- `ttd config show|get|set` (local write by default; `--global` for global file)
+- `ttd config show|get|set|init` (local write by default; `--global` for global file; interactive init wizard)
 - pydantic-settings `Settings` loads layered TOML; v1 keys: `data_dir`, `db_filename`, `clock_format`
-- `ttd db *` and DB init use the same `get_settings()` source
+- `ttd db *` and DB init use the same `get_settings()` source; pytest autouse config isolation in `tests/conftest.py`
 
-**Not in M4:** Consuming clock prefs in log/list (follow-up); API/TUI config UI
+**Plan:** `plans/2026-05-29-001-feat-config-toml-plan.md`
 
-**Requirements:** `brainstorms/2026-05-29-config-toml-requirements.md`
+**Not in M4:** Consuming clock prefs in log/list (follow-up); timezone in config (deferred); API/TUI config UI
 
 **Depends on:** M0–M3
 

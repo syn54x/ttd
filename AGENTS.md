@@ -7,6 +7,7 @@ TTD is a terminal-native billable ledger. Read `STRATEGY.md` for product scope b
 - `src/ttd/core/` — async domain services and persistence; **all business logic here**
 - `src/ttd/cli/`, `api/`, `tui/` — thin adapters only (parse → call core → format); CLI output uses **Rich** (`ttd.cli.console`, `ttd.cli.output`)
 - `tests/` — pytest; mirror `core` structure for service tests
+- `docs/solutions/` — documented solutions to past problems (bugs, patterns, workflow), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`); relevant when implementing or debugging in documented areas
 
 ## Commands
 
