@@ -24,8 +24,12 @@ from ttd.core.services.export import (
     export_period_numbers,
     export_period_xlsx,
 )
+from ttd.core.services.portable_json import export_ledger_json, render_ledger_json
 
-app = App(name="export", help="Export billing periods to CSV, XLSX, or Numbers.")
+app = App(
+    name="export",
+    help="Export billing periods or the full ledger.",
+)
 
 _EXPORT_SUFFIXES = {".csv": "csv", ".xlsx": "xlsx", ".numbers": "numbers"}
 
@@ -118,5 +122,30 @@ async def export_period(
                 project_id=resolved_project_id,
             )
         output.write_bytes(payload)
+    except BaseException as exc:
+        cli_exit(exc)
+
+
+@app.command
+async def json(
+    *,
+    output: Annotated[
+        Path | None,
+        Parameter(
+            name="--output",
+            help="Write full-ledger JSON to this path (required).",
+        ),
+    ] = None,
+) -> None:
+    """Export the full ledger to JSON."""
+    try:
+        if output is None:
+            raise ValidationError(
+                "Full-ledger JSON export requires --output PATH "
+                "(for example: ttd export json --output ledger.json)."
+            )
+        await ensure_db()
+        document = await export_ledger_json()
+        output.write_text(render_ledger_json(document), encoding="utf-8")
     except BaseException as exc:
         cli_exit(exc)

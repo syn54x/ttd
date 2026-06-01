@@ -6,9 +6,9 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from ttd.core.models.enums import BillingMode
+from ttd.core.models.enums import BillingMode, EntryMode
 
 
 class CreateClient(BaseModel):
@@ -111,3 +111,73 @@ class UpdateIntervalEntry(BaseModel):
     ended_at: datetime | None = None
     billable: bool | None = None
     note: str | None = None
+
+
+LEDGER_SCHEMA_VERSION = 1
+
+
+class LedgerClientRecord(BaseModel):
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    id: UUID
+    name: str
+    default_hourly_rate: Decimal = Field(gt=0)
+    currency: str = Field(min_length=3, max_length=3)
+    rounding_increment_minutes: int | None = Field(default=None, gt=0)
+
+
+class LedgerProjectRecord(BaseModel):
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    id: UUID
+    client_id: UUID
+    name: str
+    billing_mode: BillingMode
+    hourly_rate: Decimal | None = Field(default=None, gt=0)
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
+    contract_total: Decimal | None = Field(default=None, gt=0)
+    soft_max_hours: Decimal | None = Field(default=None, gt=0)
+    rounding_increment_minutes: int | None = Field(default=None, gt=0)
+
+
+class LedgerEntryRecord(BaseModel):
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    id: UUID
+    project_id: UUID
+    work_date: date
+    entry_mode: EntryMode
+    billable_hours: Decimal = Field(gt=0)
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    billable: bool = True
+    note: str | None = None
+
+
+class LedgerDocument(BaseModel):
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    schema_version: int = LEDGER_SCHEMA_VERSION
+    exported_at: datetime
+    clients: list[LedgerClientRecord]
+    projects: list[LedgerProjectRecord]
+    time_entries: list[LedgerEntryRecord]
+
+    @field_validator("schema_version")
+    @classmethod
+    def supported_schema(cls, value: int) -> int:
+        if value != LEDGER_SCHEMA_VERSION:
+            msg = f"Unsupported ledger schema version {value}"
+            raise ValueError(msg)
+        return value
+
+
+class ImportSummary(BaseModel):
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    clients_inserted: int = 0
+    clients_skipped: int = 0
+    projects_inserted: int = 0
+    projects_skipped: int = 0
+    entries_inserted: int = 0
+    entries_skipped: int = 0

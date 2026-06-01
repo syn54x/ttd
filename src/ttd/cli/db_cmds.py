@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
 from cyclopts import App, Parameter
@@ -57,6 +58,45 @@ async def migrate() -> None:
     try:
         location = await db_admin.apply_schema()
         success(f"Schema applied at {location.db_path}")
+    except BaseException as exc:
+        cli_exit(exc)
+
+
+@app.command
+async def backup(
+    destination: Annotated[
+        Path,
+        Parameter(help="Path to write the backup SQLite file."),
+    ],
+) -> None:
+    """Copy the ledger database to a backup file."""
+    try:
+        result = await db_admin.backup_database(destination)
+        success(f"Backed up ledger to {result.destination}")
+        muted(f"Size: {_format_bytes(result.size_bytes)}")
+    except BaseException as exc:
+        cli_exit(exc)
+
+
+@app.command
+async def restore(
+    source: Annotated[
+        Path,
+        Parameter(help="Path to a backup SQLite file."),
+    ],
+    *,
+    yes: Annotated[
+        bool,
+        Parameter(
+            name=["-y", "--yes"],
+            help="Confirm destructive restore (replaces the current ledger).",
+        ),
+    ] = False,
+) -> None:
+    """Replace the active ledger database with a backup file."""
+    try:
+        location = await db_admin.restore_database(source, confirmed=yes)
+        success(f"Restored ledger at {location.db_path}")
     except BaseException as exc:
         cli_exit(exc)
 

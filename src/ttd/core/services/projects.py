@@ -78,6 +78,22 @@ async def create_project(data: CreateProject) -> Project:
     return project
 
 
+async def insert_project_if_absent(project_id: UUID, data: CreateProject) -> bool:
+    """Insert a project when ``project_id`` is not already present."""
+    if await Project.get_or_none(project_id) is not None:
+        return False
+    await client_service.get_client(data.client_id)
+    project = Project(
+        id=project_id,
+        client_id=data.client_id,
+        name=data.name.strip(),
+        billing_mode=data.billing_mode,
+    )
+    _apply_create_fields(project, data)
+    await project.save()
+    return True
+
+
 async def get_project(project_id: UUID) -> Project:
     project = await Project.get_or_none(project_id)
     if project is None:

@@ -20,8 +20,8 @@ This document sequences **when** TTD ships capability. [STRATEGY.md](https://git
 | M2 | Terminal capture (CLI) | **Done** |
 | M3 | Export & period close (CSV) | **Done** |
 | M4 | Configuration (TOML + CLI) | **Done** |
-| M5 | Data trust & hardening | Next |
-| M6 | TUI | Planned |
+| M5 | Data trust & hardening | **Done** |
+| M6 | TUI | Next |
 | M7 | PDF / Markdown invoices | Planned |
 | M8 | API | Planned |
 | M9 | Public release | Planned |
@@ -39,7 +39,7 @@ flowchart LR
     M8 --> M9[M9 Release]
 ```
 
-M5 is next — data trust and hardening after export and layered config are in place. **M6–M8** are thin surfaces and export formats over the same core — no duplicate domain logic.
+M5 is done — backup/restore, portable JSON, Hypothesis rounding tests, and whole-package coverage `fail_under`. **M6** is next (Textual TUI).
 
 ---
 
@@ -160,13 +160,16 @@ M5 is next — data trust and hardening after export and layered config are in p
 
 **Outcome:** The ledger is safe to stake client invoices on; quality gates match billing sensitivity.
 
-**Ship when:**
+**Delivered:**
 
-- Documented backup/restore of the SQLite database
-- Plain-file or portable export path (requirements define format)
-- Edit visibility for post-export corrections (supports post-export correction rate metric)
-- pytest coverage `fail_under` enabled for billing-critical modules
-- Hypothesis property tests for rounding and hour calculations
+- `ttd db backup` / `ttd db restore` — SQLite online backup to a user-chosen path; destructive restore with `--yes`
+- `ttd export json` / `ttd import json` — full-ledger JSON with merge-by-ID import (skip existing rows)
+- Hypothesis property tests for export rounding (`tests/core/test_rounding_hypothesis.py`)
+- pytest coverage `fail_under = 68` on the whole `ttd` package
+
+**Plan:** `plans/2026-05-31-001-feat-m5-data-trust-plan.md`
+
+**Not in M5:** Post-export edit audit / change tracking (deferred by requirements)
 
 **Depends on:** M1–M4 (trust features wrap real ledger, export, and config)
 
