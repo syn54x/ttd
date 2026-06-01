@@ -9,7 +9,7 @@ from ferro.exceptions import ModelDoesNotExist
 from ttd.core.exceptions import NotFoundError, ValidationError
 from ttd.core.models.client import Client
 from ttd.core.models.project import Project
-from ttd.core.schemas import CreateClient, UpdateClient
+from ttd.core.schemas import CreateClient, LedgerClientRecord, UpdateClient
 
 
 def _validate_rounding_minutes(value: int | None) -> None:
@@ -28,6 +28,22 @@ async def create_client(data: CreateClient) -> Client:
     )
     await client.save()
     return client
+
+
+async def insert_client_if_absent(record: LedgerClientRecord) -> bool:
+    """Insert a client when ``record.id`` is not already present."""
+    if await Client.get_or_none(record.id) is not None:
+        return False
+    _validate_rounding_minutes(record.rounding_increment_minutes)
+    client = Client(
+        id=record.id,
+        name=record.name.strip(),
+        default_hourly_rate=record.default_hourly_rate,
+        currency=record.currency.upper(),
+        rounding_increment_minutes=record.rounding_increment_minutes,
+    )
+    await client.save()
+    return True
 
 
 async def get_client(client_id: UUID) -> Client:

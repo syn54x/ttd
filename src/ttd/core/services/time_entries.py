@@ -13,6 +13,7 @@ from ttd.core.models.time_entry import TimeEntry
 from ttd.core.schemas import (
     CreateDurationEntry,
     CreateIntervalEntry,
+    LedgerEntryRecord,
     UpdateDurationEntry,
     UpdateIntervalEntry,
 )
@@ -66,6 +67,30 @@ async def create_interval_entry(data: CreateIntervalEntry) -> TimeEntry:
     _require_interval_fields(entry)
     await entry.save()
     return entry
+
+
+async def insert_entry_if_absent(record: LedgerEntryRecord) -> bool:
+    """Insert a time entry when ``record.id`` is not already present."""
+    if await TimeEntry.get_or_none(record.id) is not None:
+        return False
+    await project_service.get_project(record.project_id)
+    entry = TimeEntry(
+        id=record.id,
+        project_id=record.project_id,
+        work_date=record.work_date,
+        entry_mode=record.entry_mode,
+        billable_hours=record.billable_hours,
+        started_at=record.started_at,
+        ended_at=record.ended_at,
+        billable=record.billable,
+        note=record.note,
+    )
+    if record.entry_mode == EntryMode.DURATION:
+        _reject_interval_fields_on_duration(entry)
+    else:
+        _require_interval_fields(entry)
+    await entry.save()
+    return True
 
 
 async def get_time_entry(entry_id: UUID) -> TimeEntry:

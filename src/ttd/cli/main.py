@@ -7,6 +7,7 @@ from ttd.cli import (
     db_cmds,
     entries_cmds,
     export_cmds,
+    import_cmds,
     log_cmds,
     project_cmds,
 )
@@ -22,6 +23,7 @@ app.command(project_cmds.app)
 app.command(log_cmds.app)
 app.command(entries_cmds.app)
 app.command(export_cmds.app)
+app.command(import_cmds.app)
 
 
 @app.default

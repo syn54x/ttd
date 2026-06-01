@@ -71,6 +71,17 @@ ttd config get db_filename
 
 Global file: `~/.config/ttd/ttd.toml`. Local override: nearest `ttd.toml` walking up from cwd. Precedence: env → local → global → defaults. See [docs/design/data-layer.md](docs/design/data-layer.md#configuration-m4).
 
+## Backup and portable JSON
+
+```bash
+ttd db backup ~/Backups/ttd.db
+ttd db restore ~/Backups/ttd.db --yes
+ttd export json --output ledger.json
+ttd import json ledger.json --yes
+```
+
+See [docs/getting-started.md](docs/getting-started.md) for restore warnings and merge-by-ID import semantics.
+
 ## Release (maintainers)
 
 ### One-time setup

@@ -166,6 +166,25 @@ Configure via CLI: `ttd client add|update --rounding-minutes N`, `ttd project ad
 
 ---
 
+## Backup and restore (M5)
+
+- Core: `backup_database` / `restore_database` in `ttd.core.db_admin`.
+- CLI: `ttd db backup PATH`, `ttd db restore PATH --yes`.
+- After `close_db()`, backup uses stdlib `sqlite3.Connection.backup()` into a single file (WAL consolidated into the destination).
+- Restore validates the source file, deletes the active `db_path` and any `-wal` / `-shm` sidecars, copies the backup into place, and reconnects via `init_db()`.
+
+---
+
+## Portable ledger JSON (M5)
+
+- Service: `ttd.core.services.portable_json` — `export_ledger_json`, `import_ledger_json`, `parse_ledger_json`.
+- CLI: `ttd export json --output PATH` (required), `ttd import json PATH --yes`.
+- Document shape: `schema_version` (currently `1`), `exported_at`, `clients`, `projects`, `time_entries` with stable UUIDs and billing fields.
+- Import policy: **skip-by-ID** — records whose `id` already exists are not overwritten. Requires `--yes` when at least one new row would be inserted.
+- On failure mid-import, inserted rows from that run are rolled back.
+
+---
+
 ## Related
 
 - Requirements: `brainstorms/2026-05-24-billing-ledger-requirements.md`
