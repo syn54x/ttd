@@ -1,0 +1,202 @@
+/* ttd — ledger meets cockpit. Thin rules, no boxes, one amber accent. */
+
+Screen {
+    background: $background;
+}
+
+#frame {
+    height: 1fr;
+}
+
+/* ---- left rail ---- */
+
+#rail {
+    width: 16;
+    padding: 1 0 0 2;
+    border-right: solid $panel;
+}
+
+#brand {
+    color: $accent;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.nav-item {
+    color: $secondary;
+    margin-bottom: 0;
+}
+
+.nav-item.active {
+    color: $accent;
+    text-style: bold;
+}
+
+/* ---- content ---- */
+
+#content {
+    padding: 1 2;
+}
+
+.section-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.muted {
+    color: $secondary;
+    margin-top: 1;
+}
+
+Rule {
+    color: $panel;
+    margin: 1 0;
+}
+
+DataTable {
+    height: auto;
+    max-height: 1fr;
+    background: $background;
+}
+
+DataTable > .datatable--header {
+    background: $background;
+    color: $accent;
+    text-style: bold;
+}
+
+Tree {
+    background: $background;
+    padding: 0 1;
+}
+
+/* ---- dashboard ---- */
+
+#big-timer {
+    margin-top: 1;
+    height: auto;
+}
+
+#heatmap {
+    margin-top: 1;
+}
+
+/* ---- reports ---- */
+
+#report-chart {
+    height: 12;
+    margin-bottom: 1;
+}
+
+/* ---- modals ---- */
+
+ModalScreen {
+    align: center middle;
+    background: $background 60%;
+}
+
+.modal-box {
+    width: 64;
+    height: auto;
+    max-height: 80%;
+    background: $surface;
+    border: round $accent 40%;
+    padding: 1 2;
+}
+
+.modal-box.wide {
+    width: 84;
+}
+
+.modal-title {
+    color: $accent;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.modal-box Input {
+    margin-bottom: 1;
+}
+
+.modal-box OptionList {
+    height: auto;
+    max-height: 10;
+    margin-bottom: 1;
+    background: $surface;
+}
+
+.modal-box DataTable {
+    background: $surface;
+    margin-bottom: 1;
+}
+
+#preview {
+    height: 1;
+    margin-bottom: 1;
+    color: $secondary;
+}
+
+/* ---- forms ---- */
+
+.form-fields {
+    height: auto;
+    max-height: 24;
+}
+
+.field-label {
+    color: $secondary;
+    margin-top: 1;
+}
+
+.field-preview {
+    height: 1;
+    color: $secondary;
+}
+
+.form-toggle-row {
+    height: auto;
+    margin-top: 1;
+}
+
+.form-toggle-row .field-label {
+    margin: 1 0 0 1;
+}
+
+.form-error {
+    height: 1;
+    margin-top: 1;
+}
+
+.modal-box Select {
+    margin-bottom: 0;
+}
+
+.modal-box Switch {
+    background: $surface;
+}
+
+.markdown-preview {
+    height: 80%;
+}
+
+.markdown-preview VerticalScroll {
+    height: 1fr;
+    margin: 1 0;
+}
+
+.markdown-preview Markdown {
+    background: $surface;
+}
+
+.modal-buttons {
+    height: auto;
+    align-horizontal: right;
+}
+
+.modal-buttons Button {
+    margin-left: 2;
+}
+
+Footer {
+    background: $background;
+}

@@ -1,0 +1,37 @@
+# Invoice {{ invoice.number }}
+
+**{{ user.name or "Your Name" }}**{% if user.email %}
+{{ user.email }}{% endif %}{% if user.address %}
+{{ user.address | replace("\n", "  \n") }}{% endif %}
+
+**Bill to:** {{ client.name }}{% if client.contact_name %} ({{ client.contact_name }}){% endif %}{% if client.email %}
+{{ client.email }}{% endif %}{% if client.address %}
+{{ client.address | replace("\n", "  \n") }}{% endif %}
+
+| | |
+|---|---|
+| Invoice number | {{ invoice.number }} |
+| Issued | {{ invoice.issued_date.strftime("%B %-d, %Y") }} |
+| Due | {{ invoice.due_date.strftime("%B %-d, %Y") if invoice.due_date else "On receipt" }} |
+| Period | {{ invoice.period_start.isoformat() }} – {{ invoice.period_end.isoformat() }} |
+
+## Work
+
+| Date | Description | Hours | Rate | Amount |
+|---|---|--:|--:|--:|
+{% for line in lines -%}
+| {{ line.work_date.strftime("%b %-d") }} | {{ line.description }} | {{ "%.2f" | format(line.billed_seconds / 3600) }} | {{ money(line.rate) }} | {{ money(line.amount) }} |
+{% endfor %}
+
+| | |
+|---|--:|
+| Subtotal | {{ money(invoice.subtotal) }} |
+{% if invoice.tax -%}
+| Tax ({{ "%.2f" | format(invoice.tax_rate * 100) }}%) | {{ money(invoice.tax) }} |
+{% endif -%}
+| **Total due** | **{{ money(invoice.total) }}** |
+
+{% if invoice.notes %}{{ invoice.notes }}
+
+{% endif -%}
+_Payment due within {{ terms_days }} days. Thank you!_

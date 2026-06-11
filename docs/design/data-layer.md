@@ -1,8 +1,8 @@
 # Data layer
 
 **Date:** 2026-05-25
-**Status:** Active
-**Applies to:** `src/ttd/core/models/`, `src/ttd/core/db.py`
+**Status:** Superseded — predates the rewrite; models now live in `src/ttd/storage/models/`, DB lifecycle in `src/ttd/storage/db.py`. Kept for the conventions; module paths are stale.
+**Applies to:** `src/ttd/core/models/`, `src/ttd/core/db.py` (old layout)
 
 Extends [general.md](general.md). Defines persistence conventions for the billing ledger.
 

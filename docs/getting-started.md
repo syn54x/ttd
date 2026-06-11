@@ -14,10 +14,11 @@ Runs `uv sync` and `uv run prek install` (same as the README quick start).
 
 ```bash
 just check
+just test
 prek run --all-files
 ```
 
-`just check` runs ruff and ty only (fast local gate). `prek run --all-files` also runs pytest (with coverage), Zensical docs build, and other hooks — the same full suite CI executes on every pull request and push to `main`.
+`just check` runs ruff and ty (fast local gate), `just test` runs pytest with coverage. `prek run --all-files` runs lint, format, type, and docs-build hooks — the same lint job CI executes on every pull request and push to `main`; tests run in a separate CI matrix (Ubuntu/macOS × Python 3.13/3.14).
 
 ## Demo data
 
@@ -25,31 +26,26 @@ prek run --all-files
 just db-seed
 ```
 
-Loads demo clients, projects, and time entries into the local SQLite database (`~/.local/share/ttd/ttd.db` by default). Safe to re-run: it skips if demo data is already present. Use `just db-seed -- --force` to replace demo rows only.
+Runs `ttd db seed-demo`, loading demo clients, projects, and time entries into the local SQLite database (`ttd db path` shows where). Use `just db-seed --reset` to wipe and reseed.
 
-## Backup and restore
+## Backup
 
 Before risky edits or migrations, snapshot the ledger:
 
 ```bash
-ttd db backup ~/Backups/ttd-$(date +%F).db
+ttd db backup
 ```
 
-Restore replaces the **entire** active database at the path from `ttd db where`:
+Copies the database to a timestamped backup file. `ttd db doctor` checks database health, and `ttd db migrate` applies pending schema migrations.
+
+## Export / import
+
+Export entries (with client/project metadata in JSON) for inspection or transfer; CSV, JSON, XLSX, and Apple Numbers are supported in both directions:
 
 ```bash
-ttd db restore ~/Backups/ttd-2026-05-31.db --yes
+ttd export ledger.json
+ttd import ledger.json --dry-run
+ttd import ledger.json --on-conflict update --create-missing
 ```
 
-Backup uses SQLite’s online backup API after closing the local connection. Restore is destructive — confirm with `--yes`.
-
-## Portable JSON export
-
-Export the full ledger (clients, projects, entries) for inspection or merge into another machine:
-
-```bash
-ttd export json --output ledger.json
-ttd import json ledger.json --yes
-```
-
-Import **merges by ID**: existing records are skipped, not updated. For a full replace, use `ttd db restore` instead.
+Imports match by entry id, then by content; invoiced entries are never touched.

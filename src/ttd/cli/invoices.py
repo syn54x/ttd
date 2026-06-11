@@ -1,0 +1,226 @@
+"""`ttd invoice …` commands."""
+
+from datetime import date, datetime
+from pathlib import Path
+from typing import Annotated
+
+from cyclopts import Parameter
+from pydantic import BaseModel, Field
+
+from ttd.cli._interactive import interactive_fill
+from ttd.cli._output import console, success, table
+from ttd.cli._pickers import client_choices
+from ttd.cli._run import TtdApp, with_db
+from ttd.config.loader import get_settings
+from ttd.core.errors import TtdError
+from ttd.core.money import format_hours, format_money
+from ttd.invoicing.markdown import write_markdown
+from ttd.invoicing.pdf import render_pdf
+from ttd.reporting import periods
+from ttd.services import invoicing as svc
+from ttd.storage.models import enum_value
+
+app = TtdApp(name="invoice", help="Create and manage invoices.")
+
+STATUS_STYLE = {"draft": "muted", "sent": "warn", "paid": "ok", "void": "err"}
+
+
+def _status_pill(status: str) -> str:
+    return f"[{STATUS_STYLE.get(status, 'muted')}]{status}[/]"
+
+
+def _parse_date(raw: str, what: str) -> date:
+    try:
+        return date.fromisoformat(raw)
+    except ValueError as exc:
+        raise TtdError(f"{what} must be YYYY-MM-DD (got '{raw}')") from exc
+
+
+def _resolve_period(
+    month: str | None, date_from: str | None, date_to: str | None
+) -> periods.Period:
+    if month is not None:
+        return periods.month_period(datetime.now().date(), ym=month)
+    if date_from is not None and date_to is not None:
+        return periods.range_period(_parse_date(date_from, "--from"), _parse_date(date_to, "--to"))
+    if date_from or date_to:
+        raise TtdError("Pass both --from and --to (or use --month)")
+    # default: last calendar month — the usual "invoice my last month" flow
+    return periods.month_period(datetime.now().date(), last=True)
+
+
+def _output_paths(view: svc.InvoiceView, out: Path | None) -> Path:
+    settings = get_settings()
+    base = out or settings.invoice.output_dir
+    return base / f"{view.invoice.number}-{view.client.slug}"
+
+
+def _render_files(view: svc.InvoiceView, pdf: bool, md: bool, out: Path | None) -> None:
+    settings = get_settings()
+    stem = _output_paths(view, out)
+    if pdf:
+        path = render_pdf(view, settings, stem.with_suffix(".pdf"))
+        success(f"Wrote {path}")
+    if md:
+        path = write_markdown(view, settings, stem.with_suffix(".md"))
+        success(f"Wrote {path}")
+
+
+def _print_draft(draft: svc.Draft) -> None:
+    t = table("Date", "Description", "Hours", "Rate", "Amount")
+    currency = draft.client.currency
+    for line in draft.lines:
+        t.add_row(
+            line.work_date.strftime("%a %b %-d"),
+            line.description,
+            f"{line.billed_seconds / 3600:.2f}",
+            format_money(line.rate, currency),
+            format_money(line.amount, currency),
+        )
+    console.print(t)
+    console.print(f"Subtotal: {format_money(draft.subtotal, currency)}")
+    if draft.tax:
+        console.print(f"Tax: {format_money(draft.tax, currency)}")
+    console.print(f"[bold]Total: {format_money(draft.total, currency)}[/bold]")
+
+
+def _validate_month(text: str) -> bool | str:
+    if not text.strip():
+        return True  # blank = last month
+    try:
+        periods.month_period(datetime.now().date(), ym=text.strip())
+    except TtdError as exc:
+        return str(exc)
+    return True
+
+
+class InvoiceCreateInput(BaseModel):
+    client: str = Field(
+        json_schema_extra={"prompt": "Client", "widget": "select", "choices": client_choices}
+    )
+    month: str | None = Field(
+        None,
+        json_schema_extra={
+            "prompt": "Month YYYY-MM (blank for last month)",
+            "validate": _validate_month,
+        },
+    )
+    pdf: bool = Field(True, json_schema_extra={"prompt": "Render PDF?"})
+    md: bool = Field(False, json_schema_extra={"prompt": "Render Markdown?"})
+
+
+@app.command(name="create")
+@with_db
+async def create(
+    *,
+    client: Annotated[str | None, Parameter(help="Client slug")] = None,
+    month: Annotated[str | None, Parameter(help="YYYY-MM")] = None,
+    date_from: Annotated[str | None, Parameter(name="--from")] = None,
+    date_to: Annotated[str | None, Parameter(name="--to")] = None,
+    number: Annotated[str | None, Parameter(help="Override the number")] = None,
+    pdf: Annotated[bool, Parameter(help="Render a PDF")] = False,
+    md: Annotated[bool, Parameter(help="Render Markdown")] = False,
+    out: Annotated[Path | None, Parameter(help="Output directory")] = None,
+    dry_run: Annotated[bool, Parameter(help="Preview, change nothing")] = False,
+    interactive: Annotated[
+        bool, Parameter(name=["--interactive", "-i"], help="Fill remaining fields via a form")
+    ] = False,
+) -> None:
+    """Invoice a client's uninvoiced billable work (defaults to last month)."""
+    settings = get_settings()
+    if interactive:
+        data = await interactive_fill(
+            InvoiceCreateInput,
+            {"client": client, "month": month, "pdf": pdf or None, "md": md or None},
+        )
+        client, month, pdf, md = data.client, data.month, data.pdf, data.md
+    if client is None:
+        raise TtdError("--client is required (or use -i for the interactive form)")
+    period = _resolve_period(month, date_from, date_to)
+
+    draft = await svc.build_draft(client, period, settings)
+    view = None
+    if not dry_run:
+        invoice = await svc.persist_draft(draft, settings, number=number)
+        view = await svc.get_invoice(invoice.number)
+
+    console.print(f"\n[bold]{draft.client.name}[/bold] — {period.label}")
+    _print_draft(draft)
+    if dry_run:
+        console.print("[muted]Dry run — nothing created.[/muted]")
+        return
+    assert view is not None
+    success(f"Created invoice [accent]{view.invoice.number}[/accent]")
+    _render_files(view, pdf, md, out)
+
+
+@app.command(name="list")
+@with_db
+async def list_() -> None:
+    """List invoices, newest first."""
+    rows = await svc.list_invoices()
+    if not rows:
+        console.print("[muted]No invoices yet — `ttd invoice create --client SLUG`[/muted]")
+        return
+    t = table("Number", "Client", "Period", "Total", "Status")
+    for invoice, client in rows:
+        t.add_row(
+            invoice.number,
+            client.slug,
+            f"{invoice.period_start:%b %-d} – {invoice.period_end:%b %-d %Y}",
+            format_money(invoice.total, invoice.currency),
+            _status_pill(enum_value(invoice.status)),
+        )
+    console.print(t)
+
+
+@app.command(name="show")
+@with_db
+async def show(number: str) -> None:
+    """Show one invoice with line items."""
+    view = await svc.get_invoice(number)
+    invoice, client = view.invoice, view.client
+    console.print(
+        f"\n[bold]Invoice {invoice.number}[/bold]  {_status_pill(enum_value(invoice.status))}"
+    )
+    console.print(
+        f"{client.name} · issued {invoice.issued_date} · due {invoice.due_date or 'on receipt'}"
+    )
+    t = table("Date", "Description", "Hours", "Rate", "Amount")
+    for line in view.lines:
+        t.add_row(
+            line.work_date.strftime("%a %b %-d"),
+            line.description,
+            format_hours(line.billed_seconds),
+            format_money(line.rate, invoice.currency),
+            format_money(line.amount, invoice.currency),
+        )
+    console.print(t)
+    console.print(f"[bold]Total: {format_money(invoice.total, invoice.currency)}[/bold]")
+
+
+@app.command(name="render")
+@with_db
+async def render(
+    number: str,
+    *,
+    pdf: bool = False,
+    md: bool = False,
+    out: Path | None = None,
+) -> None:
+    """(Re)render an invoice's PDF/Markdown files."""
+    if not pdf and not md:
+        pdf = md = True
+    view = await svc.get_invoice(number)
+    _render_files(view, pdf, md, out)
+
+
+@app.command(name="mark")
+@with_db
+async def mark(
+    number: str,
+    status: Annotated[str, Parameter(help="sent|paid|void")],
+) -> None:
+    """Update invoice status; void releases its entries for re-invoicing."""
+    invoice = await svc.mark_invoice(number, status)
+    success(f"Invoice {invoice.number} marked {enum_value(invoice.status)}")

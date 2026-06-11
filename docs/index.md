@@ -1,13 +1,13 @@
 # TTD
 
-Terminal-native billable ledger for solo developers who invoice by the hour.
+Terminal-first time tracking, reporting, and invoicing for solo developers.
 
 See the [roadmap](roadmap.md) for milestone sequencing and [STRATEGY.md](https://github.com/syn54x/ttd/blob/main/STRATEGY.md) for product direction.
 
 ## Prerequisites
 
 - [uv](https://docs.astral.sh/uv/)
-- Python 3.14 (`uv python install 3.14`)
+- Python 3.13+ (`uv python install 3.13`)
 
 ## Setup
 
@@ -20,10 +20,9 @@ prek install
 
 ## Run checks
 
-CI runs the same command as local full-repo verification:
-
 ```bash
-prek run --all-files
+prek run --all-files   # lint, format, types, docs build
+uv run pytest          # test suite (CI runs this on Ubuntu/macOS, 3.13/3.14)
 ```
 
 ## Install (released)

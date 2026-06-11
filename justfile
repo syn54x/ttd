@@ -9,15 +9,27 @@ default:
 check:
     uv run ruff check .
     uv run ruff format --check .
-    uv run ty check
+    uv run ty check src
 
 # Install Python deps (uv) and git hooks (prek via uv).
 setup:
     uv sync
     uv run prek install
 
+test *args:
+    uv run pytest {{args}}
+
+# Auto-fix lint findings and reformat.
+fix:
+    uv run ruff check --fix src tests
+    uv run ruff format src tests
+
+# Run the TUI with live reload for development.
+tui:
+    uv run textual run --dev ttd.tui.app:TtdApp
+
 db-seed *ARGS:
-    uv run python -m ttd.core.seed {{ARGS}}
+    uv run ttd db seed-demo {{ARGS}}
 
 # Build wheel/sdist and verify the ttd CLI from the artifact (pre-release smoke).
 release-smoke:
