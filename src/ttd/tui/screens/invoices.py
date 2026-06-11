@@ -260,8 +260,13 @@ class InvoicesScreen(TtdScreen):
             if not yes:
                 return
             try:
-                await svc.mark_invoice(number, status)
-                self.notify(f"{number} marked {status}")
+                invoice = await svc.mark_invoice(
+                    number, status, set_aside_rate=get_settings().tax.set_aside_rate
+                )
+                message = f"{number} marked {status}"
+                if status == "paid" and invoice.set_aside:
+                    message += f" · set aside {format_money(invoice.set_aside, invoice.currency)}"
+                self.notify(message)
             except TtdError as exc:
                 self.notify(str(exc), severity="error")
             await self.refresh_data()

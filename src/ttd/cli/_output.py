@@ -29,11 +29,19 @@ def table(*columns: str, title: str | None = None) -> Table:
         show_edge=False,
         pad_edge=False,
     )
+    right_cols = (
+        "rate",
+        "hours",
+        "amount",
+        "total",
+        "seconds",
+        "income",
+        "set aside",
+        "remitted",
+        "balance",
+    )
     for col in columns:
-        justify = (
-            "right" if col.lower() in ("rate", "hours", "amount", "total", "seconds") else "left"
-        )
-        t.add_column(col, justify=justify)
+        t.add_column(col, justify="right" if col.lower() in right_cols else "left")
     return t
 
 

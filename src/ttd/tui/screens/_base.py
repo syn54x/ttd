@@ -20,6 +20,7 @@ NAV = [
     ("clients", "3 clients"),
     ("reports", "4 reports"),
     ("invoices", "5 invoices"),
+    ("taxes", "6 taxes"),
 ]
 
 
@@ -34,6 +35,7 @@ class TtdScreen(Screen):
         ("3", "goto('clients')", "clients"),
         ("4", "goto('reports')", "reports"),
         ("5", "goto('invoices')", "invoices"),
+        ("6", "goto('taxes')", "taxes"),
         ("s", "toggle_timer", "start/stop"),
         ("l", "quick_log", "log"),
         ("r", "refresh", "refresh"),

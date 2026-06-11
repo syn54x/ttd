@@ -11,6 +11,7 @@ from ttd.config.schema import Settings
 from ttd.core.errors import ConflictError, NotFoundError, TtdError
 from ttd.core.money import to_cents
 from ttd.core.rollup import EntryFacts, rollup_days
+from ttd.core.taxes import compute_set_aside
 from ttd.invoicing.numbering import next_number
 from ttd.reporting.periods import Period
 from ttd.services.clients import get_client
@@ -200,9 +201,17 @@ async def list_invoices() -> list[tuple[Invoice, Client]]:
 VALID_MARKS = ("sent", "paid", "void")
 
 
-async def mark_invoice(number: str, status: str) -> Invoice:
+async def mark_invoice(
+    number: str,
+    status: str,
+    *,
+    paid_date: date | None = None,
+    set_aside_rate: Decimal = Decimal("0"),
+) -> Invoice:
     if status not in VALID_MARKS:
         raise TtdError(f"Status must be one of {', '.join(VALID_MARKS)} (got '{status}')")
+    if paid_date is not None and status != "paid":
+        raise TtdError("A paid date only applies when marking paid")
     view = await get_invoice(number)
     invoice = view.invoice
     current = enum_value(invoice.status)
@@ -214,8 +223,23 @@ async def mark_invoice(number: str, status: str) -> Invoice:
                 entry.invoice_id = None
                 await entry.save()
             invoice.status = InvoiceStatus.VOID
+            _clear_paid_snapshot(invoice)
             await invoice.save()
     else:
         invoice.status = InvoiceStatus(status)
+        if status == "paid":
+            # Snapshot at paid-time; re-marking paid re-snapshots (the
+            # documented correction path for backfilled dates or rates).
+            invoice.paid_date = paid_date or date.today()
+            invoice.set_aside_rate = set_aside_rate
+            invoice.set_aside = compute_set_aside(invoice.subtotal, set_aside_rate)
+        else:
+            _clear_paid_snapshot(invoice)
         await invoice.save()
     return invoice
+
+
+def _clear_paid_snapshot(invoice: Invoice) -> None:
+    invoice.paid_date = None
+    invoice.set_aside_rate = None
+    invoice.set_aside = None

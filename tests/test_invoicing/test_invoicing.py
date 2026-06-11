@@ -128,12 +128,18 @@ async def test_void_releases_entries(seeded):
 async def test_mark_sent_and_paid(seeded):
     draft = await svc.build_draft("acme", JUNE, SETTINGS)
     invoice = await svc.persist_draft(draft, SETTINGS, now=NOW)
-    await svc.mark_invoice(invoice.number, "sent")
-    await svc.mark_invoice(invoice.number, "paid")
+    sent = await svc.mark_invoice(invoice.number, "sent")
+    assert sent.paid_date is None and sent.set_aside is None
+    await svc.mark_invoice(
+        invoice.number, "paid", paid_date=date(2026, 6, 20), set_aside_rate=Decimal("0.32")
+    )
     view = await svc.get_invoice(invoice.number)
     from ttd.storage.models import enum_value
 
     assert enum_value(view.invoice.status) == "paid"
+    assert view.invoice.paid_date == date(2026, 6, 20)
+    assert view.invoice.set_aside_rate == Decimal("0.32")
+    assert view.invoice.set_aside == Decimal("288.00")  # 32% of the 900.00 subtotal
 
 
 async def test_tax_applied(seeded):
@@ -157,6 +163,19 @@ async def test_markdown_snapshot(seeded):
     assert "$900.00" in md
     assert "API — 2 entries" in md
     assert "Payment due within 30 days" in md
+
+
+async def test_set_aside_never_reaches_client_renders(seeded, tmp_path):
+    """The tax set-aside is internal — it must not leak onto client invoices."""
+    from ttd.invoicing.pdf import render_pdf
+
+    draft = await svc.build_draft("acme", JUNE, SETTINGS)
+    invoice = await svc.persist_draft(draft, SETTINGS, now=NOW)
+    await svc.mark_invoice(invoice.number, "paid", set_aside_rate=Decimal("0.32"))
+    view = await svc.get_invoice(invoice.number)
+    md = render_markdown(view, SETTINGS)
+    assert "set aside" not in md.lower()
+    render_pdf(view, SETTINGS, tmp_path / "invoice.pdf")  # must not crash on snapshot fields
 
 
 async def test_pdf_smoke(seeded, tmp_path):

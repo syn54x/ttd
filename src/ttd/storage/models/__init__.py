@@ -8,6 +8,7 @@ from ttd.storage.models.entry import Entry
 from ttd.storage.models.enums import EntrySource, InvoiceStatus, enum_value
 from ttd.storage.models.invoice import Invoice, InvoiceLine
 from ttd.storage.models.project import Project
+from ttd.storage.models.tax_payment import TaxPayment
 from ttd.storage.models.timer import TIMER_SINGLETON_ID, TimerState
 
 
@@ -30,6 +31,7 @@ __all__ = [
     "InvoiceLine",
     "InvoiceStatus",
     "Project",
+    "TaxPayment",
     "TimerState",
     "enum_value",
 ]

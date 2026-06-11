@@ -59,6 +59,7 @@ async def test_navigation_between_screens(seeded_app):
             ("3", "clients"),
             ("4", "reports"),
             ("5", "invoices"),
+            ("6", "taxes"),
             ("1", "dashboard"),
         ]:
             await pilot.press(key)
@@ -487,3 +488,43 @@ async def test_invoice_markdown_preview(seeded_app):
         await pilot.press("escape")
         await pilot.pause()
         assert not isinstance(seeded_app.screen, MarkdownPreviewModal)
+
+
+async def test_taxes_screen_shows_quarters_and_payment_modal(seeded_app):
+    from datetime import date
+    from datetime import timedelta as td
+
+    from ttd.config.schema import Settings as S
+    from ttd.core.taxes import TaxQuarter, compute_set_aside
+    from ttd.reporting.periods import range_period
+    from ttd.tui.screens.taxes import TaxPaymentModal
+
+    await init_db()
+    period = range_period(date.today() - td(days=30), date.today())
+    draft = await invoice_svc.build_draft("acme-corp", period, S())
+    invoice = await invoice_svc.persist_draft(draft, S())
+    await invoice_svc.mark_invoice(invoice.number, "paid", set_aside_rate=Decimal("0.32"))
+    await close_db()
+
+    expected = compute_set_aside(draft.subtotal, Decimal("0.32"))
+    quarter = TaxQuarter.from_date(date.today())
+
+    async with seeded_app.run_test(size=(120, 40)) as pilot:
+        await pilot.press("6")
+        await pilot.pause()
+        screen = seeded_app.screen
+        assert screen.nav_id == "taxes"
+        table = screen.query_one("#tax-table")
+        assert table.row_count == 4
+        row = table.get_row(quarter.label)
+        assert f"{expected:,.2f}" in str(row[4])  # set aside column
+
+        await pilot.press("p")
+        await pilot.pause()
+        modal = seeded_app.screen
+        assert isinstance(modal, TaxPaymentModal)
+        assert modal.query_one("#quarter").value == quarter.label
+        modal.query_one("#amount").value = "150"
+        await pilot.press("escape")
+        await pilot.pause()
+        assert seeded_app.screen.nav_id == "taxes"

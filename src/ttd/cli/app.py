@@ -26,6 +26,7 @@ def _register_subcommands() -> None:
         log,
         projects,
         reports,
+        taxes,
         timer,
     )
 
@@ -34,6 +35,7 @@ def _register_subcommands() -> None:
     app.command(entries.app)
     app.command(reports.app)
     app.command(invoices.app)
+    app.command(taxes.app)
     app.command(config_cmds.app)
     app.command(db_cmds.app)
     timer.register(app)
