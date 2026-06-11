@@ -104,6 +104,7 @@ exclude_lines = [
 name = "cz_conventional_commits"
 tag_format = "v$version"
 version_scheme = "pep440"
+major_version_zero = true
 version_provider = "uv"
 version_files = [
     "src/ttd/__init__.py:__version__",
