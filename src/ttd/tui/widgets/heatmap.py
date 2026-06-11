@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from rich.text import Text
 from textual.widget import Widget
 
-from ttd.tui.theme import HEAT_RAMP
+from ttd.tui.theme import HEAT_RAMP, heat_level
 
 CELL = "▮"
 DAY_LABELS = {0: "mon", 2: "wed", 4: "fri"}
@@ -26,18 +26,6 @@ class Heatmap(Widget):
         self._data = by_date
         self._today = today or date.today()
         self.refresh()
-
-    def _level(self, seconds: int) -> int:
-        if seconds <= 0:
-            return 0
-        hours = seconds / 3600
-        if hours < 2:
-            return 1
-        if hours < 4:
-            return 2
-        if hours < 6:
-            return 3
-        return 4
 
     def render(self) -> Text:
         today = self._today
@@ -64,7 +52,7 @@ class Heatmap(Widget):
                 if day is None:
                     text.append("  ")
                     continue
-                level = self._level(self._data.get(day, 0))
+                level = heat_level(self._data.get(day, 0))
                 style = HEAT_RAMP[level]
                 if day == today:
                     style += " bold underline"

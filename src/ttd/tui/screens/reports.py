@@ -1,4 +1,4 @@
-"""Reports: weekly/monthly rollups with sparklines and billable value."""
+"""Reports: weekly/monthly rollups with activity heat strips and billable value."""
 
 from datetime import date, timedelta
 from decimal import Decimal
@@ -12,22 +12,23 @@ from ttd.config.loader import get_settings
 from ttd.core.money import format_hours, format_money
 from ttd.core.rollup import EntryFacts, amount, rollup_days
 from ttd.reporting import periods
-from ttd.reporting.render import BLOCKS
 from ttd.services import entries as entry_svc
 from ttd.services import projects as project_svc
 from ttd.tui._data import pk
 from ttd.tui.screens._base import TtdScreen
+from ttd.tui.theme import HEAT_RAMP, heat_level
+from ttd.tui.widgets.heatmap import CELL
 from ttd.tui.widgets.report_chart import ReportChart
 
 
-def _spark(values: list[int]) -> str:
-    if not values or max(values) == 0:
-        return "·" * min(len(values), 31)
-    peak = max(values)
+def _heat_strip(values: list[int]) -> str:
+    """One cell per day, colored by the same intensity ramp as the heatmap."""
     out = []
     for v in values[-31:]:
-        idx = 0 if v == 0 else max(1, round(v / peak * (len(BLOCKS) - 1)))
-        out.append(BLOCKS[idx] if v else "·")
+        if v <= 0:
+            out.append("[dim]·[/dim]")
+        else:
+            out.append(f"[{HEAT_RAMP[heat_level(v)]}]{CELL}[/]")
     return "".join(out)
 
 
@@ -127,7 +128,7 @@ class ReportsScreen(TtdScreen):
                 labels[project_id],
                 str(len({c.work_date for c in group})),
                 format_hours(seconds),
-                f"[#ffb000]{_spark([by_date.get(d, 0) for d in days])}[/#ffb000]",
+                _heat_strip([by_date.get(d, 0) for d in days]),
                 format_money(value, currencies[project_id]) if has_rate else "—",
             )
         self.query_one("#report-title", Label).update(f"{period.label}")

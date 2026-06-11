@@ -49,3 +49,17 @@ TTD_LIGHT = Theme(
 
 # amber intensity ramp for the activity heatmap (empty → hot)
 HEAT_RAMP = ["#1a1e24", "#4d3500", "#7d5600", "#b87e00", "#ffb000"]
+
+
+def heat_level(seconds: int) -> int:
+    """Map a day's seconds to a HEAT_RAMP index — shared by every heat visual."""
+    if seconds <= 0:
+        return 0
+    hours = seconds / 3600
+    if hours < 2:
+        return 1
+    if hours < 4:
+        return 2
+    if hours < 6:
+        return 3
+    return 4
