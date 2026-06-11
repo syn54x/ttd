@@ -1,5 +1,5 @@
 ---
-description: TTD architecture — core vs surface adapters, async boundaries
+description: TTD architecture — domain/services vs surface adapters, async boundaries
 alwaysApply: true
 ---
 
@@ -7,20 +7,18 @@ alwaysApply: true
 
 ## Layering
 
-- **`ttd.core`** — all billing/ledger domain logic, ferro-orm models, async services
-- **`ttd.cli` / `ttd.api` / `ttd.tui`** — thin adapters only: parse input → `await` core → format output
+- **`ttd.core`** — pure domain logic: rollup, rounding, money, slugs, errors (no I/O)
+- **`ttd.services`** — async application services orchestrating storage + core
+- **`ttd.storage`** — ferro-orm models and DB lifecycle
+- **`ttd.parsing` / `ttd.invoicing` / `ttd.interchange` / `ttd.reporting`** — focused capability packages used by services and surfaces
+- **`ttd.cli` / `ttd.tui`** — thin adapters only: parse input → `await` services → format output
 
 Never implement domain rules, rounding, or persistence in surface packages.
 
 ## Async
 
-- Core services and DB access are `async`
-- CLI uses cyclopts async commands; API uses Litestar lifespan for DB init; TUI calls async core helpers from async hooks
-
-## Surface rollout (see `docs/roadmap.md`)
-
-- M1–M4: CLI-first ledger + CSV export; domain logic only in core
-- M5–M7: TUI, PDF/Markdown invoices, API — thin adapters; no business logic ahead of core services for each milestone
+- Services and DB access are `async`
+- CLI uses cyclopts async commands; TUI calls async services from Textual async hooks
 
 ## Deeper reference
 

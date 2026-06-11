@@ -6,14 +6,14 @@ on:
     branches: [main]
 
 jobs:
-  checks:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.14"
+          python-version: "3.13"
           enable-cache: true
 
       - name: Install dependencies
@@ -24,6 +24,35 @@ jobs:
 
       - name: Run prek on all files
         run: uv run prek run --all-files
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.13", "3.14"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen --all-groups
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Upload TUI snapshot report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshot-report-${{ matrix.os }}-${{ matrix.python }}
+          path: snapshot_report.html
+          if-no-files-found: ignore
 
   pr-title:
     if: github.event_name == 'pull_request'

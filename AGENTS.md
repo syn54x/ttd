@@ -1,12 +1,19 @@
 # Agent notes
 
-TTD is a terminal-native billable ledger. Read `STRATEGY.md` for product scope before adding features.
+TTD is terminal-first time tracking, reporting, and invoicing for solo developers. Read `STRATEGY.md` for product scope before adding features.
 
 ## Layout
 
-- `src/ttd/core/` — async domain services and persistence; **all business logic here**
-- `src/ttd/cli/`, `api/`, `tui/` — thin adapters only (parse → call core → format); CLI output uses **Rich** (`ttd.cli.console`, `ttd.cli.output`)
-- `tests/` — pytest; mirror `core` structure for service tests
+- `src/ttd/core/` — pure domain logic: rollup, rounding, money, slugs, errors (no I/O)
+- `src/ttd/services/` — async application services (entries, clients, projects, invoicing, timer, interchange); orchestrate storage + core
+- `src/ttd/storage/` — ferro-orm models and DB lifecycle (`storage/db.py`, `storage/models/`)
+- `src/ttd/config/` — layered TOML config (loader, writer, Pydantic schema)
+- `src/ttd/parsing/` — natural-language time parser (tokens → grammar → resolve)
+- `src/ttd/invoicing/` — invoice rendering (PDF via fpdf2, Markdown via Jinja) and numbering
+- `src/ttd/interchange/` — CSV/JSON/XLSX/Numbers import & export
+- `src/ttd/reporting/` — report rendering and period helpers
+- `src/ttd/cli/`, `src/ttd/tui/` — thin adapters only (parse → call services → format); CLI is Cyclopts + Rich, TUI is Textual
+- `tests/test_<domain>/` — pytest, organized by functional domain (e.g. `tests/test_parsing/`, `tests/test_invoicing/`)
 - `docs/solutions/` — documented solutions to past problems (bugs, patterns, workflow), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`); relevant when implementing or debugging in documented areas
 
 ## Commands
@@ -14,9 +21,9 @@ TTD is a terminal-native billable ledger. Read `STRATEGY.md` for product scope b
 ```bash
 uv sync
 just check             # ruff + ty (required before finishing agent work)
-prek run --all-files   # full check suite (CI parity)
-uv run pytest
-uv run ttd
+just test              # pytest with coverage
+prek run --all-files   # lint/format/type/docs hooks (CI lint-job parity)
+uv run ttd             # bare ttd launches the TUI
 ```
 
 **Done means green:** run `just check` and fix failures before handoff. See `.cursor/rules/quality-gate.mdc`.
@@ -34,19 +41,19 @@ Full guide: [`docs/design/general.md`](docs/design/general.md)
 
 **Non-negotiables:**
 
-- Domain logic only in `ttd.core` — never duplicate across CLI, API, or TUI
-- Async throughout core; surfaces bridge at the boundary (`asyncio` / cyclopts / Litestar lifespan)
+- Domain and service logic only in `ttd.core` / `ttd.services` — never duplicate across CLI or TUI
+- Async throughout services and storage; surfaces bridge at the boundary (cyclopts async commands, Textual async hooks)
 - Pydantic `BaseModel` for structured data; `ConfigDict(use_attribute_docstrings=True)` on documented models
-- Raise in core at the point of failure; catch at surface adapters for user-facing messages and exit codes
+- Raise in services at the point of failure; catch at surface adapters for user-facing messages and exit codes
 - Prefer clarity over pattern adherence — extract functions/classes only when they earn their existence (see guide §1–2)
-- ferro-orm models in core for SQLite; separate DTOs when export/API shapes differ
+- ferro-orm models in `ttd.storage` for SQLite; separate DTOs when export shapes differ
 - Conventional commits; changelog updated at release via commitizen (not per-PR)
 
 ## Conventions
 
-- Python 3.14, uv, ruff, ty, pytest + Hypothesis for billing-sensitive invariants
+- Python 3.13+, uv, ruff, ty, pytest + Hypothesis for billing-sensitive invariants; TUI snapshot tests via pytest-textual-snapshot
 - Local-first SQLite; no cloud sync in v1
-- M1–M4: CLI-first ledger + CSV; M5–M7 add TUI, PDF/Markdown invoices, API — see `docs/roadmap.md`
+- Entries are wall-clock local time — naive datetimes are intentional (DTZ lint rules are deliberately ignored)
 
 ## Planning artifacts
 

@@ -1,121 +1,135 @@
-"""`ttd db` — local database location and maintenance."""
+"""`ttd db …` commands."""
 
-from __future__ import annotations
-
+import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
-from cyclopts import App, Parameter
-from rich.table import Table
+from cyclopts import Parameter
+from rich.prompt import Confirm
 
-from ttd.cli.console import info, muted, success
-from ttd.cli.errors import cli_exit
-from ttd.core import db_admin
+from ttd.cli._output import console, success
+from ttd.cli._run import TtdApp, abort, with_db
+from ttd.config.loader import get_settings
+from ttd.storage.db import db_lifespan
+from ttd.storage.models import Client, Entry, Invoice, Project
 
-app = App(
-    name="db",
-    help="Manage the local ledger database (SQLite).",
-)
-
-
-def _format_bytes(size: int) -> str:
-    if size < 1024:
-        return f"{size} B"
-    if size < 1024 * 1024:
-        return f"{size / 1024:.1f} KiB"
-    return f"{size / (1024 * 1024):.1f} MiB"
+app = TtdApp(name="db", help="Database utilities.")
 
 
-def _print_location(location: db_admin.DbLocation) -> None:
-    table = Table(show_header=False, box=None, padding=(0, 2))
-    table.add_row("[bold]data_dir[/bold]", str(location.data_dir))
-    table.add_row("[bold]db_path[/bold]", str(location.db_path))
-    table.add_row("[bold]dsn[/bold]", location.db_dsn)
-    if location.exists:
-        size = (
-            _format_bytes(location.size_bytes)
-            if location.size_bytes is not None
-            else "—"
-        )
-        table.add_row("[bold]file[/bold]", f"[green]exists[/green] ({size})")
-    else:
-        table.add_row("[bold]file[/bold]", "[dim]not created yet[/dim]")
-    info(table)
+@app.command(name="path")
+def path() -> None:
+    """Show the database file location."""
+    console.print(str(get_settings().db_path))
 
 
-@app.command
-async def where() -> None:
-    """Show where the ledger database file lives."""
-    try:
-        _print_location(db_admin.describe_db())
-    except BaseException as exc:
-        cli_exit(exc)
+@app.command(name="backup")
+def backup(
+    dest: Annotated[Path | None, Parameter(help="Destination file or directory")] = None,
+) -> None:
+    """Copy the database to a timestamped backup."""
+    src = get_settings().db_path
+    if not src.is_file():
+        console.print("[muted]No database yet — nothing to back up.[/muted]")
+        return
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    target = dest if dest is not None else src.parent
+    if target.is_dir() or dest is None:
+        target = target / f"ttd-{stamp}.db"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, target)
+    success(f"Backed up to {target}")
 
 
-@app.command
+@app.command(name="migrate")
+@with_db
 async def migrate() -> None:
-    """Apply the current model schema to the database (ferro auto_migrate)."""
-    try:
-        location = await db_admin.apply_schema()
-        success(f"Schema applied at {location.db_path}")
-    except BaseException as exc:
-        cli_exit(exc)
+    """Create/upgrade the schema (also happens automatically on first use)."""
+    success("Schema is up to date")
 
 
-@app.command
-async def backup(
-    destination: Annotated[
-        Path,
-        Parameter(help="Path to write the backup SQLite file."),
-    ],
-) -> None:
-    """Copy the ledger database to a backup file."""
-    try:
-        result = await db_admin.backup_database(destination)
-        success(f"Backed up ledger to {result.destination}")
-        muted(f"Size: {_format_bytes(result.size_bytes)}")
-    except BaseException as exc:
-        cli_exit(exc)
+@app.command(name="doctor")
+@with_db
+async def doctor() -> None:
+    """Sanity-check the database and print summary counts."""
+    counts = {
+        "clients": await Client.select().count(),
+        "projects": await Project.select().count(),
+        "entries": await Entry.select().count(),
+        "invoices": await Invoice.select().count(),
+    }
+    console.print(f"db: {get_settings().db_path}")
+    for name, n in counts.items():
+        console.print(f"  {name}: {n}")
+    success("Database looks healthy")
 
 
-@app.command
-async def restore(
-    source: Annotated[
-        Path,
-        Parameter(help="Path to a backup SQLite file."),
-    ],
+@app.command(name="seed-demo")
+async def seed_demo(
     *,
-    yes: Annotated[
-        bool,
-        Parameter(
-            name=["-y", "--yes"],
-            help="Confirm destructive restore (replaces the current ledger).",
-        ),
-    ] = False,
+    yes: Annotated[bool, Parameter(help="Skip confirmation")] = False,
+    reset: Annotated[bool, Parameter(help="Delete the existing database first")] = False,
 ) -> None:
-    """Replace the active ledger database with a backup file."""
-    try:
-        location = await db_admin.restore_database(source, confirmed=yes)
-        success(f"Restored ledger at {location.db_path}")
-    except BaseException as exc:
-        cli_exit(exc)
+    """Populate demo clients, projects, and ~3 months of entries (for trying the TUI)."""
+    db_path = get_settings().db_path
+    prompt = (
+        f"Delete {db_path} and reseed with demo data?"
+        if reset
+        else "Add demo data to the current database?"
+    )
+    if not yes and not Confirm.ask(prompt):
+        abort()
+    # The reset must happen before the DB opens, so the lifespan is managed
+    # inline rather than via @with_db.
+    if reset:
+        for suffix in ("", "-wal", "-shm"):  # sqlite sidecar files too
+            sidecar = Path(f"{db_path}{suffix}")
+            if sidecar.exists():
+                sidecar.unlink()
 
+    async def _seed() -> int:
+        import random
+        from datetime import timedelta
+        from decimal import Decimal
 
-@app.command
-async def reset(
-    *,
-    yes: Annotated[
-        bool,
-        Parameter(
-            name=["-y", "--yes"],
-            help="Confirm destructive reset (deletes all ledger data).",
-        ),
-    ] = False,
-) -> None:
-    """Delete the database file and recreate empty tables."""
-    try:
-        location = await db_admin.reset_database(confirmed=yes)
-        success(f"Reset database at {location.db_path}")
-        muted("All clients, projects, and time entries were removed.")
-    except BaseException as exc:
-        cli_exit(exc)
+        from ttd.services import clients as client_svc
+        from ttd.services import entries as entry_svc
+        from ttd.services import projects as project_svc
+
+        random.seed(42)
+        now = datetime.now()
+        await client_svc.create_client(
+            "Acme Corp", hourly_rate=Decimal("150"), email="billing@acme.test"
+        )
+        await client_svc.create_client("Beta LLC", hourly_rate=Decimal("95"), currency="EUR")
+        await project_svc.create_project("API Rewrite", "acme-corp")
+        await project_svc.create_project("Mobile App", "acme-corp", hourly_rate=Decimal("175"))
+        await project_svc.create_project("Design System", "beta-llc")
+        projects = ["api-rewrite", "api-rewrite", "mobile-app", "design-system"]
+        notes = ["", "standup + pairing", "code review", "deep work", "client call"]
+        count = 0
+        # today always has work, so the TUI's default views aren't empty
+        today = now.date().isoformat()
+        await entry_svc.log_entry(
+            f"{today} 09:00 for 2h30m", "api-rewrite", now=now, note="deep work", force=True
+        )
+        await entry_svc.log_entry(
+            f"{today} 13:00 for 1h30m", "design-system", now=now, note="reviews", force=True
+        )
+        count += 2
+        for days_back in range(1, 92):
+            day = (now - timedelta(days=days_back)).date()
+            if day.weekday() >= 5 or random.random() < 0.25:
+                continue
+            start_hour = random.choice([8, 9, 10])
+            length = random.choice([2, 3, 4, 6])
+            spec = f"{day.isoformat()} {start_hour:02d}:00 for {length}h"
+            await entry_svc.log_entry(
+                spec, random.choice(projects), now=now, note=random.choice(notes), force=True
+            )
+            count += 1
+        return count
+
+    async with db_lifespan():
+        count = await _seed()
+    success(f"Seeded 2 clients, 3 projects, {count} entries — run `ttd` to explore")

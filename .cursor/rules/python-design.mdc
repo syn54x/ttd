@@ -21,7 +21,7 @@ Do not extract single-use 2–3 line helpers.
 - **`BaseModel`** for structured data crossing service boundaries
 - Set `model_config = ConfigDict(use_attribute_docstrings=True)` and document fields with attribute docstrings
 - Use `Field(...)` for constraints; prefer attribute docstrings over `Field(description=...)`
-- **ferro-orm `Model`** for persisted entities in `ttd.core`
+- **ferro-orm `Model`** for persisted entities in `ttd.storage.models`
 - **`pydantic.dataclasses.dataclass`** only for ephemeral internal bundles that never cross boundaries
 
 ## Errors

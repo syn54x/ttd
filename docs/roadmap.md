@@ -5,6 +5,8 @@ last_updated: 2026-05-29
 
 # Roadmap
 
+> **Note:** This roadmap predates the ground-up rewrite that replaced the implementation (module paths like `ttd.core.services.*` no longer exist). Milestone history is kept for context; a refreshed roadmap is pending.
+
 This document sequences **when** TTD ships capability. [STRATEGY.md](https://github.com/syn54x/ttd/blob/main/STRATEGY.md) defines **why** and **what tracks** matter; individual features get requirements in `brainstorms/` and implementation plans in `plans/` (repo root — excluded from the docs site build) before code lands.
 
 **Product goal:** Replace the spreadsheet + manual invoice assembly loop for a solo developer billing hourly. **M1–M4** deliver the CLI ledger, period export, and layered TOML configuration; **M5–M8** add data trust, TUI, client-ready invoice formats, and API; **M9** is the first public release. Success is measured by the metrics in `STRATEGY.md`.

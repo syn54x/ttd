@@ -1,38 +1,42 @@
 [project]
 name = "ttd-ledger"
 version = "0.2.1"
-description = "Terminal-native billable ledger for solo developers"
+description = "Terminal-first time tracking, reporting, and invoicing for solo developers"
 readme = "README.md"
-requires-python = ">=3.14"
+authors = [
+    { name = "Taylor", email = "taylor@x54.sh" }
+]
+requires-python = ">=3.13"
 dependencies = [
-    "cyclopts>=4.0.0",
     "ferro-orm[alembic]>=0.10.5",
-    "litestar[standard]>=2.0.0",
-    "numbers-parser>=4.18.5",
-    "openpyxl>=3.1.5",
-    "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",
-    "questionary>=2.0.0",
-    "rich>=13.0.0",
-    "textual>=3.0.0",
-    "timefhuman>=0.1.0",
-    "tomli-w>=1.2.0",
+    "cyclopts>=4.17",
+    "rich>=14",
+    "textual>=3.0",
+    "pydantic>=2.7",
+    "questionary>=2.0",
+    "platformdirs>=4",
+    "tomlkit>=0.13",
+    "jinja2>=3.1",
+    "openpyxl>=3.1",
+    "numbers-parser>=4.18",
+    "fpdf2>=2.8",
+    "textual-plotext>=1.0.1",
 ]
 
 [project.scripts]
-ttd = "ttd.cli.main:main"
-ttd-api = "ttd.api.app:run"
-ttd-tui = "ttd.tui.app:main"
+ttd = "ttd.cli.app:main"
 
 [dependency-groups]
 dev = [
     "commitizen>=4.0.0",
-    "hypothesis>=6.0.0",
-    "prek>=0.4.0",
-    "pytest>=8.0.0",
-    "pytest-asyncio>=0.24.0",
-    "pytest-cov>=6.0.0",
-    "ruff>=0.9.0",
+    "hypothesis>=6",
+    "prek>=0.4",
+    "pytest>=8",
+    "pytest-asyncio>=1.0",
+    "pytest-cov>=6",
+    "pytest-textual-snapshot>=1.1",
+    "ruff>=0.11",
+    "textual-dev>=1.7",
     "ty>=0.0.1a0",
     "zensical>=0.0.6",
 ]
@@ -48,15 +52,25 @@ module-name = "ttd"
 default-groups = ["dev"]
 
 [tool.ruff]
-target-version = "py314"
-line-length = 88
+target-version = "py313"
+line-length = 100
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "TC", "PTH", "DTZ"]
+allowed-confusables = ["–", "—"]
+ignore = [
+    "DTZ005", # naive local datetimes are intentional: entries are wall-clock local time
+    "DTZ011",
+    "DTZ001",
+    "DTZ007",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["DTZ"]
 
 [tool.ty.environment]
-python-version = "3.14"
+python-version = "3.13"
 
 [tool.ty.src]
 include = ["src"]
@@ -79,7 +93,7 @@ relative_files = true
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 68
+fail_under = 84
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
