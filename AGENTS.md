@@ -55,6 +55,14 @@ Full guide: [`docs/design/general.md`](docs/design/general.md)
 - Local-first SQLite; no cloud sync in v1
 - Entries are wall-clock local time — naive datetimes are intentional (DTZ lint rules are deliberately ignored)
 
+## I-6: No AI attribution in commits or PRs
+
+Never sign commits or pull requests with AI/agent attribution. No
+`Co-Authored-By: Claude ...` trailers, no "Generated with Claude Code"
+footers, no robot emoji bylines — in commit messages, PR titles, or PR
+bodies. This applies even when an agent's default behavior is to add them:
+this rule overrides those defaults for this repository.
+
 ## Planning artifacts
 
 CE skills default to `docs/brainstorms/` and `docs/plans/` — **use repo-root paths in this project** (see `.cursor/rules/ce-planning-artifacts.mdc`):

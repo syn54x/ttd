@@ -48,6 +48,21 @@ class InvoiceConfig(_Section):
         return v.expanduser()
 
 
+class TaxConfig(_Section):
+    # Fraction of each paid invoice's subtotal to set aside for estimated
+    # taxes — the user's own rule, not tax law. 0 disables the feature.
+    set_aside_rate: Decimal = Decimal("0")
+
+    _rate = field_validator("set_aside_rate", mode="before")(_to_decimal)
+
+    @field_validator("set_aside_rate", mode="after")
+    @classmethod
+    def _bounded(cls, v: Decimal) -> Decimal:
+        if not (Decimal("0") <= v < Decimal("1")):
+            raise ValueError("set_aside_rate is a fraction — use 0.32 for 32%")
+        return v
+
+
 class BillingConfig(_Section):
     rounding: Literal["nearest", "up", "none"] = "nearest"
     increment_minutes: int = 15
@@ -83,6 +98,7 @@ class Settings(_Section):
     user: UserConfig = UserConfig()
     business: BusinessConfig = BusinessConfig()
     invoice: InvoiceConfig = InvoiceConfig()
+    tax: TaxConfig = TaxConfig()
     billing: BillingConfig = BillingConfig()
     display: DisplayConfig = DisplayConfig()
     parsing: ParsingConfig = ParsingConfig()

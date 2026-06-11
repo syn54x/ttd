@@ -27,6 +27,11 @@ class Invoice(Model):
     status: Annotated[InvoiceStatus, FerroField(db_type="text")] = InvoiceStatus.DRAFT
     notes: str = ""
     created_at: datetime
+    paid_date: Annotated[date | None, FerroField(db_type="date")] = None
+    # Tax set-aside snapshot, frozen when the invoice is marked paid so later
+    # config changes never rewrite history (must match the bank account).
+    set_aside_rate: Decimal | None = None
+    set_aside: Decimal | None = None
 
 
 class InvoiceLine(Model):

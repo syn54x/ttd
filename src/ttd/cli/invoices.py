@@ -14,10 +14,12 @@ from ttd.cli._run import TtdApp, with_db
 from ttd.config.loader import get_settings
 from ttd.core.errors import TtdError
 from ttd.core.money import format_hours, format_money
+from ttd.core.taxes import compute_set_aside, format_rate
 from ttd.invoicing.markdown import write_markdown
 from ttd.invoicing.pdf import render_pdf
 from ttd.reporting import periods
 from ttd.services import invoicing as svc
+from ttd.services import taxes as taxes_svc
 from ttd.storage.models import enum_value
 
 app = TtdApp(name="invoice", help="Create and manage invoices.")
@@ -82,6 +84,13 @@ def _print_draft(draft: svc.Draft) -> None:
     if draft.tax:
         console.print(f"Tax: {format_money(draft.tax, currency)}")
     console.print(f"[bold]Total: {format_money(draft.total, currency)}[/bold]")
+    rate = get_settings().tax.set_aside_rate
+    if rate > 0:
+        preview = compute_set_aside(draft.subtotal, rate)
+        console.print(
+            f"[muted]Set aside at {format_rate(rate)} when paid: "
+            f"{format_money(preview, currency)}[/muted]"
+        )
 
 
 def _validate_month(text: str) -> bool | str:
@@ -197,6 +206,20 @@ async def show(number: str) -> None:
         )
     console.print(t)
     console.print(f"[bold]Total: {format_money(invoice.total, invoice.currency)}[/bold]")
+    settings = get_settings()
+    if enum_value(invoice.status) == "paid":
+        paid_on, rate, set_aside = taxes_svc.paid_facts(invoice, settings.tax.set_aside_rate)
+        if set_aside:
+            console.print(
+                f"Set aside ({format_rate(rate)}): "
+                f"{format_money(set_aside, invoice.currency)} · paid {paid_on}"
+            )
+    elif settings.tax.set_aside_rate > 0 and enum_value(invoice.status) != "void":
+        preview = compute_set_aside(invoice.subtotal, settings.tax.set_aside_rate)
+        console.print(
+            f"[muted]Set aside at {format_rate(settings.tax.set_aside_rate)} when paid: "
+            f"{format_money(preview, invoice.currency)}[/muted]"
+        )
 
 
 @app.command(name="render")
@@ -220,7 +243,28 @@ async def render(
 async def mark(
     number: str,
     status: Annotated[str, Parameter(help="sent|paid|void")],
+    *,
+    paid_date: Annotated[
+        str | None, Parameter(name="--paid-date", help="YYYY-MM-DD (default today); paid only")
+    ] = None,
 ) -> None:
-    """Update invoice status; void releases its entries for re-invoicing."""
-    invoice = await svc.mark_invoice(number, status)
-    success(f"Invoice {invoice.number} marked {enum_value(invoice.status)}")
+    """Update invoice status; void releases its entries for re-invoicing.
+
+    Marking paid records the paid date and freezes the tax set-aside at the
+    current `tax.set_aside_rate` — re-mark with --paid-date to correct either.
+    """
+    settings = get_settings()
+    invoice = await svc.mark_invoice(
+        number,
+        status,
+        paid_date=_parse_date(paid_date, "--paid-date") if paid_date else None,
+        set_aside_rate=settings.tax.set_aside_rate,
+    )
+    message = f"Invoice {invoice.number} marked {enum_value(invoice.status)}"
+    if invoice.set_aside and invoice.set_aside_rate:
+        message += (
+            f" ({invoice.paid_date}) — set aside "
+            f"{format_money(invoice.set_aside, invoice.currency)}"
+            f" ({format_rate(invoice.set_aside_rate)})"
+        )
+    success(message)

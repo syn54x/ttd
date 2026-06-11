@@ -21,8 +21,18 @@ Extends [general.md](general.md). Defines persistence conventions for the billin
 
 ### Active development: `auto_migrate`
 
-- `init_db()` imports `ttd.core.models` before `connect` so all `Model` subclasses register metadata.
-- `auto_migrate=True` creates or updates tables to match models.
+- `init_db()` imports `ttd.storage.models` before `connect` so all `Model` subclasses register metadata.
+- `auto_migrate=True` creates missing **tables only** — it does **not** add columns
+  to existing tables when a model gains fields between releases.
+- **Column adds:** `_COLUMN_ADDS` in `src/ttd/storage/db.py` is an idempotent
+  shim that `ALTER TABLE ADD COLUMN`s nullable fields at startup (first used for
+  the invoice tax set-aside columns). After any DDL it must `reset_engine()` and
+  reconnect: querying through the live pool after an ALTER panics the sqlx
+  worker and **silently returns zero rows** on ferro-orm 0.10.5 — see
+  [ferro-orm#67](https://github.com/syn54x/ferro-orm/issues/67) and the repro in
+  `docs/upstream/ferro-alter-table-stale-pool-repro-standalone.py`. The shim can
+  be retired if [ferro-orm#68](https://github.com/syn54x/ferro-orm/issues/68)
+  (auto_migrate column adds) ships.
 - **Tests:** each test uses an isolated `Settings(data_dir=tmp_path)` database; `reset_db_state` closes the engine between tests.
 - **Local dev:** if the on-disk `ttd.db` drifts after model changes, delete `~/.local/share/ttd/ttd.db` (or your configured `data_dir`) and reconnect.
 

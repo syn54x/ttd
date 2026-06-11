@@ -10,6 +10,7 @@ from ttd.tui.screens.clients import ClientsScreen
 from ttd.tui.screens.dashboard import DashboardScreen
 from ttd.tui.screens.invoices import InvoicesScreen
 from ttd.tui.screens.reports import ReportsScreen
+from ttd.tui.screens.taxes import TaxesScreen
 from ttd.tui.screens.timesheet import TimesheetScreen
 from ttd.tui.theme import TTD_DARK, TTD_LIGHT
 
@@ -24,6 +25,7 @@ class TtdApp(App):
         "clients": ClientsScreen,
         "reports": ReportsScreen,
         "invoices": InvoicesScreen,
+        "taxes": TaxesScreen,
     }
 
     async def on_mount(self) -> None:
