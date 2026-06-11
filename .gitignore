@@ -20,3 +20,4 @@ site/
 *.csv
 *.xlsx
 *.numbers
+export.json
