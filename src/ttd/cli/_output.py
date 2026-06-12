@@ -39,6 +39,8 @@ def table(*columns: str, title: str | None = None) -> Table:
         "set aside",
         "remitted",
         "balance",
+        "est. tax",
+        "take-home",
     )
     for col in columns:
         t.add_column(col, justify="right" if col.lower() in right_cols else "left")

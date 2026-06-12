@@ -12,6 +12,7 @@ from ttd.config.loader import get_settings
 from ttd.core.errors import TtdError
 from ttd.core.money import format_hours
 from ttd.core.rollup import EntryFacts, amount, rollup_days, seconds_by_date
+from ttd.core.taxes import compute_set_aside
 from ttd.reporting import periods
 from ttd.reporting.render import day_series, hours_cell, money_cell, sparkline
 from ttd.services import entries as entry_svc
@@ -71,6 +72,8 @@ def _render(period: periods.Period, facts, rates, meta, by: str) -> None:
     days = period.days()
     total_seconds = sum(f.seconds for f in facts)
     total_amount = Decimal("0")
+    total_tax = Decimal("0")
+    set_aside_rate = settings.tax.set_aside_rate  # 0 hides the tax columns
     any_rate = False
 
     if by == "day":
@@ -82,6 +85,7 @@ def _render(period: periods.Period, facts, rates, meta, by: str) -> None:
             value = amount(billed, rates[cell.project_id])
             if value is not None:
                 total_amount += value
+                total_tax += compute_set_aside(value, set_aside_rate)
                 any_rate = True
             day_label = cell.work_date.strftime("%a %b %-d")
             t.add_row(
@@ -100,7 +104,10 @@ def _render(period: periods.Period, facts, rates, meta, by: str) -> None:
         groups: dict = {}
         for cell in cells:
             groups.setdefault(key_of(cell), []).append(cell)
-        t = table("Client" if by == "client" else "Project", "Days", "Hours", "Activity", "Amount")
+        headers = ["Client" if by == "client" else "Project", "Days", "Hours", "Activity", "Amount"]
+        if set_aside_rate > 0:
+            headers += ["Est. Tax", "Take-Home"]
+        t = table(*headers)
         for _, group in sorted(groups.items(), key=lambda kv: -sum(c.seconds for c in kv[1])):
             project, client = meta[group[0].project_id]
             label = client.slug if by == "client" else f"{client.slug}/{project.slug}"
@@ -113,23 +120,36 @@ def _render(period: periods.Period, facts, rates, meta, by: str) -> None:
                 if v is not None:
                     value += v
                     has_rate = True
+            tax = compute_set_aside(value, set_aside_rate)
             if has_rate:
                 total_amount += value
+                total_tax += tax
                 any_rate = True
             group_by_date = seconds_by_date([f for f in facts if key_of_fact(f, by, meta) == label])
-            t.add_row(
+            row = [
                 label,
                 str(len({c.work_date for c in group})),
                 hours_cell(seconds, billable),
                 sparkline(day_series(group_by_date, days)) if len(days) > 1 else "",
                 money_cell(value if has_rate else None, client.currency),
-            )
+            ]
+            if set_aside_rate > 0:
+                row += [
+                    money_cell(tax if has_rate else None, client.currency),
+                    money_cell(value - tax if has_rate else None, client.currency),
+                ]
+            t.add_row(*row)
         console.print(t)
 
     summary = f"Total: [bold]{format_hours(total_seconds)}[/bold]"
     if any_rate:
         currency = next(iter(meta.values()))[1].currency
         summary += f"  ·  [bold]{money_cell(total_amount, currency)}[/bold] billable value"
+        if set_aside_rate > 0:
+            summary += (
+                f"  ·  [bold]{money_cell(total_tax, currency)}[/bold] est. tax"
+                f"  ·  [bold]{money_cell(total_amount - total_tax, currency)}[/bold] take-home"
+            )
     console.print(summary)
 
 

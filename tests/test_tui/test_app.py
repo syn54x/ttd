@@ -177,6 +177,26 @@ async def test_reports_screen_modes(seeded_app):
         )
 
 
+async def test_reports_screen_tax_columns(seeded_app, monkeypatch):
+    monkeypatch.setenv("TTD_TAX__SET_ASIDE_RATE", "0.32")
+    async with seeded_app.run_test(size=(140, 40)) as pilot:
+        await pilot.press("4")
+        await pilot.pause()
+        screen = seeded_app.screen
+        table = screen.query_one("#report-table")
+        labels = [str(col.label) for col in table.columns.values()]
+        assert labels[-2:] == ["est. tax", "take-home"]
+        total = str(screen.query_one("#report-total").content)
+        assert "est. tax" in total
+        assert "take-home" in total
+        # rate cleared mid-session → columns drop on the next render
+        monkeypatch.delenv("TTD_TAX__SET_ASIDE_RATE")
+        await pilot.press("r")
+        await pilot.pause()
+        labels = [str(col.label) for col in table.columns.values()]
+        assert labels == ["project", "days", "hours", "activity", "value"]
+
+
 async def test_invoices_screen_create_flow(seeded_app):
     async with seeded_app.run_test(size=(120, 40)) as pilot:
         await pilot.press("5")
