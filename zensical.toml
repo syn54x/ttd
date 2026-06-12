@@ -53,6 +53,31 @@ nav = [
 [project.theme]
 name = "material"
 
+# Automatic light/dark mode: follows the system preference by default, with
+# explicit light and dark toggles (amber to match the ttd brand).
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+primary = "amber"
+accent = "amber"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "Switch to light mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "amber"
+accent = "amber"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "amber"
+accent = "amber"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to system preference"
+
 # Preliminary Zensical mkdocstrings support (cross-reference backlinks not yet
 # supported). Used only by reference/configuration.md.
 [project.plugins.mkdocstrings.handlers.python]
