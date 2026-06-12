@@ -30,6 +30,7 @@ ttd = "ttd.cli.app:main"
 dev = [
     "commitizen>=4.0.0",
     "hypothesis>=6",
+    "mkdocstrings[python]>=0.30",
     "prek>=0.4",
     "pytest>=8",
     "pytest-asyncio>=1.0",

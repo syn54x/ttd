@@ -6,6 +6,7 @@ from typing import ClassVar
 
 from textual import on
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Input, Label
@@ -16,6 +17,8 @@ from ttd.core.money import format_money, parse_money
 from ttd.core.taxes import TaxQuarter, format_rate
 from ttd.services import taxes as svc
 from ttd.tui.screens._base import TtdScreen
+
+YEAR_GROUP = Binding.Group("year", compact=True)
 
 
 class TaxPaymentModal(ModalScreen[dict | None]):
@@ -66,8 +69,8 @@ class TaxesScreen(TtdScreen):
 
     BINDINGS: ClassVar = [
         *TtdScreen.BINDINGS,
-        ("left_square_bracket", "shift_year(-1)", "prev year"),
-        ("right_square_bracket", "shift_year(1)", "next year"),
+        Binding("left_square_bracket", "shift_year(-1)", "prev year", group=YEAR_GROUP),
+        Binding("right_square_bracket", "shift_year(1)", "next year", group=YEAR_GROUP),
         ("p", "record_payment", "record payment"),
     ]
 

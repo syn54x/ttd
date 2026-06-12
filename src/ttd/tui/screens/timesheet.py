@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from typing import ClassVar, Literal, cast
 
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.coordinate import Coordinate
 from textual.widgets import DataTable, Label
@@ -15,11 +16,13 @@ from ttd.core.money import format_hours
 from ttd.reporting import periods
 from ttd.services import entries as entry_svc
 from ttd.tui._data import hours_for_row, project_options, split_and_log
-from ttd.tui.screens._base import TtdScreen
+from ttd.tui.screens._base import PREV_NEXT_GROUP, TtdScreen
 from ttd.tui.widgets.forms import FormField, FormModal
 from ttd.tui.widgets.modals import ConfirmModal, QuickLogModal
 
 Span = Literal["day", "week", "month"]
+
+SPAN_GROUP = Binding.Group("span", compact=True)
 
 
 def _entry_spec(entry) -> str:
@@ -36,11 +39,11 @@ class TimesheetScreen(TtdScreen):
 
     BINDINGS: ClassVar = [
         *TtdScreen.BINDINGS,
-        ("d", "span('day')", "day"),
-        ("w", "span('week')", "week"),
-        ("m", "span('month')", "month"),
-        ("left_square_bracket", "shift(-1)", "prev"),
-        ("right_square_bracket", "shift(1)", "next"),
+        Binding("d", "span('day')", "day", group=SPAN_GROUP),
+        Binding("w", "span('week')", "week", group=SPAN_GROUP),
+        Binding("m", "span('month')", "month", group=SPAN_GROUP),
+        Binding("left_square_bracket", "shift(-1)", "prev", group=PREV_NEXT_GROUP),
+        Binding("right_square_bracket", "shift(1)", "next", group=PREV_NEXT_GROUP),
         ("g", "today", "today"),
         ("a", "add_entry", "add"),
         ("e", "edit_entry", "edit"),

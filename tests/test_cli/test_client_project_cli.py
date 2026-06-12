@@ -10,6 +10,13 @@ def test_version():
     assert result.output.startswith("ttd ")
 
 
+def test_install_completion_registered():
+    """The installation docs document `ttd --install-completion`; keep it real."""
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    assert "--install-completion" in result.output
+
+
 def test_client_add_list_roundtrip(isolated_config):
     result = runner.invoke(
         app, ["client", "add", "Acme Corp", "--rate", "150", "--email", "a@b.co"]
@@ -62,6 +69,24 @@ def test_config_list_with_origin(isolated_config):
     assert result.exit_code == 0
     assert "EUR" in result.output
     assert "global" in result.output
+
+
+def test_config_list_shows_descriptions(isolated_config):
+    result = runner.invoke(app, ["config", "list"])
+    assert result.exit_code == 0
+    assert "Description" in result.output
+    assert "Billing increment" in result.output
+
+
+def test_every_config_key_has_a_description():
+    from ttd.cli.config_cmds import _descriptions, _flatten
+    from ttd.config.schema import Settings
+
+    keys = set(_flatten(Settings().model_dump(mode="json")))
+    descriptions = _descriptions()
+    assert set(descriptions) == keys
+    missing = [k for k, d in descriptions.items() if not d]
+    assert not missing, f"config fields missing a description: {missing}"
 
 
 def test_db_doctor(isolated_config):

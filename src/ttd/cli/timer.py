@@ -45,7 +45,7 @@ def register(app: TtdApp) -> None:
             bool, Parameter(name=["--interactive", "-i"], help="Fill remaining fields via a form")
         ] = False,
     ) -> None:
-        """Start a timer (project defaults to [defaults].project from config)."""
+        """Start a timer (project defaults to `defaults.project` from config)."""
         now = datetime.now()
         settings = get_settings()
 

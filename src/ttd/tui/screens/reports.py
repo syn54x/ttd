@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import ClassVar
 
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.widgets import DataTable, Label
 
@@ -15,7 +16,7 @@ from ttd.reporting import periods
 from ttd.services import entries as entry_svc
 from ttd.services import projects as project_svc
 from ttd.tui._data import pk
-from ttd.tui.screens._base import TtdScreen
+from ttd.tui.screens._base import PREV_NEXT_GROUP, TtdScreen
 from ttd.tui.theme import HEAT_RAMP, heat_level
 from ttd.tui.widgets.heatmap import CELL
 from ttd.tui.widgets.report_chart import ReportChart
@@ -32,15 +33,18 @@ def _heat_strip(values: list[int]) -> str:
     return "".join(out)
 
 
+MODE_GROUP = Binding.Group("mode", compact=True)
+
+
 class ReportsScreen(TtdScreen):
     nav_id = "reports"
 
     BINDINGS: ClassVar = [
         *TtdScreen.BINDINGS,
-        ("w", "mode('week')", "week"),
-        ("m", "mode('month')", "month"),
-        ("left_square_bracket", "shift(-1)", "prev"),
-        ("right_square_bracket", "shift(1)", "next"),
+        Binding("w", "mode('week')", "week", group=MODE_GROUP),
+        Binding("m", "mode('month')", "month", group=MODE_GROUP),
+        Binding("left_square_bracket", "shift(-1)", "prev", group=PREV_NEXT_GROUP),
+        Binding("right_square_bracket", "shift(1)", "next", group=PREV_NEXT_GROUP),
     ]
 
     def __init__(self) -> None:

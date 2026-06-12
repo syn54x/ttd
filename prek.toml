@@ -16,6 +16,7 @@ hooks = [
   { id = "ruff-check", name = "ruff check", entry = "uv run ruff check --fix .", language = "system", pass_filenames = false, always_run = true },
   { id = "ruff-format", name = "ruff format", entry = "uv run ruff format .", language = "system", pass_filenames = false, always_run = true },
   { id = "ty-check", name = "ty check", entry = "uv run ty check src", language = "system", pass_filenames = false, always_run = true },
+  { id = "cli-docs", name = "cli reference docs", entry = "uv run python scripts/gen_cli_docs.py", language = "system", pass_filenames = false, always_run = true },
   { id = "zensical-build", name = "zensical build", entry = "uv run zensical build --clean", language = "system", pass_filenames = false, always_run = true },
   { id = "ce-artifacts-not-in-docs", name = "CE artifacts not in docs/", entry = "bash -c 'if [ -e docs/brainstorms ] || [ -e docs/plans ]; then echo \"CE planning artifacts belong at repo root (brainstorms/, plans/), not under docs/. See .cursor/rules/ce-planning-artifacts.mdc\"; exit 1; fi'", language = "system", pass_filenames = false, always_run = true },
 ]

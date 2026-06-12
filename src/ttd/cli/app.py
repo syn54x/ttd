@@ -45,6 +45,7 @@ def _register_subcommands() -> None:
 
 
 _register_subcommands()
+app.register_install_completion_command()
 
 
 @app.default
