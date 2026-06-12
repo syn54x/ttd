@@ -5,13 +5,15 @@ from datetime import datetime
 from typing import ClassVar
 
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import Footer, Label
+from textual.widgets import Label
 
 from ttd.core.errors import TtdError
 from ttd.services import timer as timer_svc
 from ttd.tui._data import project_options, split_and_log
+from ttd.tui.widgets.footer import AdaptiveFooter
 from ttd.tui.widgets.modals import PickerModal, QuickLogModal
 
 NAV = [
@@ -23,6 +25,13 @@ NAV = [
     ("taxes", "6 taxes"),
 ]
 
+# The nav rail already names each screen next to its number, so the footer
+# shows the nav keys as one compact group instead of six labelled items.
+SCREEN_GROUP = Binding.Group("screen", compact=True)
+
+PREV_NEXT_GROUP = Binding.Group("prev/next", compact=True)
+"""Shared by screens that page through periods with [ and ]."""
+
 
 class TtdScreen(Screen):
     """Nav rail + content + footer; global timer/log actions."""
@@ -30,16 +39,16 @@ class TtdScreen(Screen):
     nav_id = ""  # subclass sets
 
     BINDINGS: ClassVar = [
-        ("1", "goto('dashboard')", "dashboard"),
-        ("2", "goto('timesheet')", "timesheet"),
-        ("3", "goto('clients')", "clients"),
-        ("4", "goto('reports')", "reports"),
-        ("5", "goto('invoices')", "invoices"),
-        ("6", "goto('taxes')", "taxes"),
-        ("s", "toggle_timer", "start/stop"),
-        ("l", "quick_log", "log"),
-        ("r", "refresh", "refresh"),
-        ("q", "quit_app", "quit"),
+        Binding("1", "goto('dashboard')", "dashboard", group=SCREEN_GROUP),
+        Binding("2", "goto('timesheet')", "timesheet", group=SCREEN_GROUP),
+        Binding("3", "goto('clients')", "clients", group=SCREEN_GROUP),
+        Binding("4", "goto('reports')", "reports", group=SCREEN_GROUP),
+        Binding("5", "goto('invoices')", "invoices", group=SCREEN_GROUP),
+        Binding("6", "goto('taxes')", "taxes", group=SCREEN_GROUP),
+        Binding("s", "toggle_timer", "start/stop"),
+        Binding("l", "quick_log", "log"),
+        Binding("r", "refresh", "refresh"),
+        Binding("q", "quit_app", "quit"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -51,7 +60,7 @@ class TtdScreen(Screen):
                     yield Label(label, classes=classes, id=f"nav-{nav_id}")
             with Vertical(id="content"):
                 yield from self.compose_content()
-        yield Footer()
+        yield AdaptiveFooter()
 
     def compose_content(self) -> ComposeResult:
         yield from ()

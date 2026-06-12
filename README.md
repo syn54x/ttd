@@ -15,6 +15,10 @@ $ ttd invoice create --client acme-corp --month 2026-06 --pdf
 ✓ Wrote ~/Documents/invoices/2026-001-acme-corp.pdf
 ```
 
+**Full documentation: [syn54x.github.io/ttd](https://syn54x.github.io/ttd/)** —
+guides, the TUI tour, time-expression cookbook, and the complete CLI and
+configuration reference.
+
 ## Install
 
 ```sh

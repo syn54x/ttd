@@ -1,17 +1,67 @@
 [project]
 site_name = "TTD"
 site_url = "https://syn54x.github.io/ttd/"
-docs_dir = "docs"
+docs_dir = "docs/pages"
 site_dir = "site"
 
-# CE planning artifacts (brainstorms/, plans/) live at repo root — outside docs_dir —
-# because Zensical does not yet support exclude_docs and would lint every markdown file.
+# Only docs/pages/ is published. Internal/AI artifacts (docs/design/, docs/solutions/,
+# docs/upstream/, docs/roadmap.md) and CE planning artifacts (brainstorms/, plans/ at
+# repo root) live outside docs_dir because Zensical does not support exclude_docs.
 
 nav = [
   { "Home" = "index.md" },
-  { "Getting started" = "getting-started.md" },
-  { "Roadmap" = "roadmap.md" },
+  { "Getting started" = [
+    { "Installation" = "getting-started/installation.md" },
+    { "Quickstart" = "getting-started/quickstart.md" },
+  ] },
+  { "Guides" = [
+    { "Tracking time" = "guides/tracking-time.md" },
+    { "Clients & projects" = "guides/clients-and-projects.md" },
+    { "Managing entries" = "guides/managing-entries.md" },
+    { "Reports" = "guides/reports.md" },
+    { "Invoicing" = "guides/invoicing.md" },
+    { "Taxes" = "guides/taxes.md" },
+    { "The TUI" = "guides/the-tui.md" },
+    { "Configuration" = "guides/configuration.md" },
+    { "Import & export" = "guides/import-export.md" },
+    { "Data & backups" = "guides/data-and-backups.md" },
+  ] },
+  { "Reference" = [
+    { "CLI" = [
+      { "Overview" = "reference/cli/index.md" },
+      { "client" = "reference/cli/client.md" },
+      { "project" = "reference/cli/project.md" },
+      { "entry" = "reference/cli/entry.md" },
+      { "timer" = "reference/cli/timer.md" },
+      { "log" = "reference/cli/log.md" },
+      { "report" = "reference/cli/report.md" },
+      { "invoice" = "reference/cli/invoice.md" },
+      { "tax" = "reference/cli/tax.md" },
+      { "config" = "reference/cli/config.md" },
+      { "db" = "reference/cli/db.md" },
+      { "export" = "reference/cli/export.md" },
+      { "import" = "reference/cli/import.md" },
+    ] },
+    { "Configuration" = "reference/configuration.md" },
+    { "Time expressions" = "reference/time-expressions.md" },
+    { "Interchange format" = "reference/interchange-format.md" },
+    { "Keyboard shortcuts" = "reference/keyboard-shortcuts.md" },
+  ] },
+  { "Contributing" = "contributing.md" },
 ]
 
 [project.theme]
 name = "material"
+
+# Preliminary Zensical mkdocstrings support (cross-reference backlinks not yet
+# supported). Used only by reference/configuration.md.
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["src"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+show_source = false
+show_root_heading = false
+show_bases = false
+show_labels = false
+heading_level = 3
+members_order = "source"

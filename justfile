@@ -31,6 +31,26 @@ tui:
 db-seed *ARGS:
     uv run ttd db seed-demo {{ARGS}}
 
+# Regenerate the CLI reference pages from the cyclopts app.
+docs-cli:
+    uv run python scripts/gen_cli_docs.py
+
+# Regenerate the TUI screenshots (SVG) from seeded demo data.
+docs-shots:
+    uv run python scripts/gen_screenshots.py
+
+# Re-record the GIF walkthroughs. Requires vhs (brew install vhs).
+docs-gifs:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    rm -rf /tmp/ttd-vhs.db /tmp/ttd-vhs-config
+    TTD_DB_PATH=/tmp/ttd-vhs.db TTD_CONFIG_DIR=/tmp/ttd-vhs-config uv run python scripts/seed_docs_demo.py
+    for tape in docs/tapes/*.tape; do vhs "$tape"; done
+
+# Serve the docs site locally with live reload.
+docs-serve:
+    uv run zensical serve
+
 # Build wheel/sdist and verify the ttd CLI from the artifact (pre-release smoke).
 release-smoke:
     rm -rf dist/
