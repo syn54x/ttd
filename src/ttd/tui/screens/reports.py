@@ -12,6 +12,7 @@ from textual.widgets import DataTable, Label
 from ttd.config.loader import get_settings
 from ttd.core.money import format_hours, format_money
 from ttd.core.rollup import EntryFacts, amount, rollup_days
+from ttd.core.taxes import compute_set_aside
 from ttd.reporting import periods
 from ttd.services import entries as entry_svc
 from ttd.services import projects as project_svc
@@ -60,8 +61,7 @@ class ReportsScreen(TtdScreen):
             yield Label("", id="report-total", classes="muted")
 
     def setup(self) -> None:
-        table = self.query_one("#report-table", DataTable)
-        table.add_columns("project", "days", "hours", "activity", "value")
+        self._table_columns: tuple[str, ...] = ()
 
     def _period(self) -> periods.Period:
         today = date.today()
@@ -101,7 +101,17 @@ class ReportsScreen(TtdScreen):
         for cell in cells:
             groups.setdefault(cell.project_id, []).append(cell)
 
+        # The set-aside rate is config, reloaded each render — rebuild the
+        # column set when it crosses zero (0 disables the tax columns).
+        set_aside_rate = settings.tax.set_aside_rate
+        columns = ("project", "days", "hours", "activity", "value")
+        if set_aside_rate > 0:
+            columns += ("est. tax", "take-home")
         table = self.query_one("#report-table", DataTable)
+        if columns != self._table_columns:
+            table.clear(columns=True)
+            table.add_columns(*columns)
+            self._table_columns = columns
         table.clear()
         days = period.days()
         day_totals: dict[date, int] = {}
@@ -110,6 +120,7 @@ class ReportsScreen(TtdScreen):
         self.query_one("#report-chart", ReportChart).update_data(days, day_totals)
         total_seconds = sum(f.seconds for f in facts)
         total_value = Decimal("0")
+        total_tax = Decimal("0")
         any_rate = False
         for project_id, group in sorted(
             groups.items(), key=lambda kv: -sum(c.seconds for c in kv[1])
@@ -125,20 +136,37 @@ class ReportsScreen(TtdScreen):
                 if v is not None:
                     value += v
                     has_rate = True
-            if has_rate:
-                total_value += value
-                any_rate = True
-            table.add_row(
+            tax = compute_set_aside(value, set_aside_rate)
+            row = [
                 labels[project_id],
                 str(len({c.work_date for c in group})),
                 format_hours(seconds),
                 _heat_strip([by_date.get(d, 0) for d in days]),
                 format_money(value, currencies[project_id]) if has_rate else "—",
-            )
+            ]
+            if set_aside_rate > 0:
+                row += (
+                    [
+                        format_money(tax, currencies[project_id]),
+                        format_money(value - tax, currencies[project_id]),
+                    ]
+                    if has_rate
+                    else ["—", "—"]
+                )
+            if has_rate:
+                total_value += value
+                total_tax += tax
+                any_rate = True
+            table.add_row(*row)
         self.query_one("#report-title", Label).update(f"{period.label}")
         total = f"total {format_hours(total_seconds)}"
         if any_rate:
             total += f" · {format_money(total_value, 'USD')} billable"
+            if set_aside_rate > 0:
+                total += (
+                    f" · {format_money(total_tax, 'USD')} est. tax"
+                    f" · {format_money(total_value - total_tax, 'USD')} take-home"
+                )
         self.query_one("#report-total", Label).update(
             f"{total}   [dim]w/m switch period · \\[ ] older/newer[/dim]"
         )

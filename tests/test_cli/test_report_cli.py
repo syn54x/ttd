@@ -35,6 +35,36 @@ def test_report_week_by_client(isolated_config):
     assert "acme" in result.output
 
 
+def test_report_tax_columns_with_rate(isolated_config):
+    _seed()
+    runner.invoke(app, ["config", "set", "tax.set_aside_rate", "0.32"])
+    result = runner.invoke(app, ["report", "week"])
+    assert result.exit_code == 0, result.output
+    assert "Est. Tax" in result.output
+    assert "192.00" in result.output  # 32% of $600
+    assert "408.00" in result.output  # take-home
+    assert "est. tax" in result.output  # totals line
+    assert "take-home" in result.output
+
+
+def test_report_tax_summary_in_day_view(isolated_config):
+    _seed()
+    runner.invoke(app, ["config", "set", "tax.set_aside_rate", "0.32"])
+    result = runner.invoke(app, ["report", "day"])
+    assert result.exit_code == 0, result.output
+    assert "Est. Tax" not in result.output  # day view keeps per-row columns lean
+    assert "est. tax" in result.output
+    assert "take-home" in result.output
+
+
+def test_report_hides_tax_columns_without_rate(isolated_config):
+    _seed()
+    result = runner.invoke(app, ["report", "week"])
+    assert result.exit_code == 0, result.output
+    assert "Est. Tax" not in result.output
+    assert "take-home" not in result.output
+
+
 def test_report_month_empty(isolated_config):
     runner.invoke(app, ["client", "add", "Acme"])
     result = runner.invoke(app, ["report", "month", "--last"])
