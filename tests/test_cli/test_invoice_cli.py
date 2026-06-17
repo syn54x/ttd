@@ -58,6 +58,36 @@ def test_invoice_lifecycle_via_cli(isolated_config):
     assert bad.exit_code == 1
 
 
+def test_invoice_tax_columns_with_rate(isolated_config):
+    _seed(isolated_config)
+    runner.invoke(app, ["config", "set", "tax.set_aside_rate", "0.32"])
+    runner.invoke(app, ["invoice", "create", "--client", "acme", "--month", "2026-06"])
+
+    listing = runner.invoke(app, ["invoice", "list"])
+    assert listing.exit_code == 0, listing.output
+    assert "Est. Tax" in listing.output
+    assert "192.00" in listing.output  # 32% of $600
+    assert "408.00" in listing.output  # take-home
+
+    show = runner.invoke(app, ["invoice", "show", "2026-001"])
+    assert "take-home" in show.output
+    assert "408.00" in show.output
+
+    runner.invoke(app, ["invoice", "mark", "2026-001", "paid"])
+    show = runner.invoke(app, ["invoice", "show", "2026-001"])
+    assert "take-home" in show.output
+    assert "paid" in show.output
+
+
+def test_invoice_list_hides_tax_columns_without_rate(isolated_config):
+    _seed(isolated_config)
+    runner.invoke(app, ["invoice", "create", "--client", "acme", "--month", "2026-06"])
+    listing = runner.invoke(app, ["invoice", "list"])
+    assert listing.exit_code == 0, listing.output
+    assert "Est. Tax" not in listing.output
+    assert "Take-Home" not in listing.output
+
+
 def test_invoiced_entries_locked_via_cli(isolated_config):
     _seed(isolated_config)
     runner.invoke(app, ["invoice", "create", "--client", "acme", "--month", "2026-06"])

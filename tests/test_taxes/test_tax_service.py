@@ -100,6 +100,37 @@ async def test_void_clears_snapshot_and_drops_from_summary(invoice):
     assert all(s.invoice_count == 0 for s in summaries)
 
 
+# --- per-invoice estimates ------------------------------------------------------
+
+
+async def test_estimate_unpaid_previews_at_current_rate(invoice):
+    estimate = svc.estimate_invoice(invoice, Decimal("0.32"))
+    assert estimate.set_aside == Decimal("288.00")
+    assert estimate.take_home == Decimal("612.00")
+
+
+async def test_estimate_paid_uses_frozen_snapshot(invoice):
+    marked = await invoice_svc.mark_invoice(
+        invoice.number, "paid", paid_date=date(2026, 5, 10), set_aside_rate=Decimal("0.32")
+    )
+    # the configured rate changed later — the snapshot must not move
+    estimate = svc.estimate_invoice(marked, Decimal("0.25"))
+    assert estimate.set_aside == Decimal("288.00")
+    assert estimate.take_home == Decimal("612.00")
+
+
+async def test_estimate_none_when_feature_off(invoice):
+    assert svc.estimate_invoice(invoice, Decimal("0")) is None
+    # paid while the rate was 0: the 0% snapshot also means "nothing to show"
+    marked = await invoice_svc.mark_invoice(invoice.number, "paid", set_aside_rate=Decimal("0"))
+    assert svc.estimate_invoice(marked, Decimal("0")) is None
+
+
+async def test_estimate_none_for_void(invoice):
+    voided = await invoice_svc.mark_invoice(invoice.number, "void")
+    assert svc.estimate_invoice(voided, Decimal("0.32")) is None
+
+
 # --- pre-feature fallback -----------------------------------------------------
 
 

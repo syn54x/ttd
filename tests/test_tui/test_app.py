@@ -242,6 +242,53 @@ async def test_invoice_detail_modal(seeded_app, monkeypatch):
         await pilot.pause()
 
 
+async def test_invoices_screen_tax_columns(seeded_app, monkeypatch):
+    # persist an invoice directly, then view the list with a rate configured
+    from datetime import date
+    from datetime import timedelta as td
+
+    from ttd.config.schema import Settings as S
+    from ttd.reporting.periods import range_period
+
+    await init_db()
+    period = range_period(date.today() - td(days=30), date.today())
+    settings = S(business={"default_hourly_rate": 100})
+    draft = await invoice_svc.build_draft("acme-corp", period, settings)
+    await invoice_svc.persist_draft(draft, settings)
+    await close_db()
+
+    monkeypatch.setenv("TTD_TAX__SET_ASIDE_RATE", "0.32")
+    async with seeded_app.run_test(size=(140, 40)) as pilot:
+        await pilot.press("5")
+        await pilot.pause()
+        screen = seeded_app.screen
+        table = screen.query_one("#invoice-table")
+        labels = [str(col.label) for col in table.columns.values()]
+        assert labels == [
+            "number",
+            "client",
+            "period",
+            "total",
+            "est. tax",
+            "take-home",
+            "status",
+        ]
+        # detail modal carries the same estimate
+        await pilot.press("o")
+        await pilot.pause()
+        from ttd.tui.screens.invoices import InvoiceDetailModal
+
+        assert isinstance(seeded_app.screen, InvoiceDetailModal)
+        await pilot.press("escape")
+        await pilot.pause()
+        # rate cleared mid-session → columns drop on the next render
+        monkeypatch.delenv("TTD_TAX__SET_ASIDE_RATE")
+        await pilot.press("r")
+        await pilot.pause()
+        labels = [str(col.label) for col in table.columns.values()]
+        assert labels == ["number", "client", "period", "total", "status"]
+
+
 # --- TUI enhancements: spans, entry edit, clients CRUD, invoice period -------
 
 
