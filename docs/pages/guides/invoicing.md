@@ -29,7 +29,9 @@ $ ttd invoice create --client acme-corp --number 2026-CUSTOM-1
 $ ttd invoice create --client acme-corp --dry-run
 ```
 
-Prints the line items, subtotal, tax, and total — and changes nothing.
+Prints the line items, subtotal, tax, and total — and changes nothing. When
+`tax.set_aside_rate` is set, the preview also shows how much to set aside and
+the estimated take-home (subtotal minus set-aside).
 
 ## Rendering PDF and Markdown
 
@@ -74,6 +76,14 @@ $ ttd invoice list            # newest first: number, client, period, total, sta
 $ ttd invoice show 2026-001   # line items, dates, subtotal/tax/total, set-aside
 ```
 
+When `tax.set_aside_rate` is greater than zero, `invoice list` also shows
+**Est. Tax** and **Take-Home** columns. Unpaid invoices preview at the current
+rate (shown muted); paid invoices use the frozen snapshot from when they were
+marked paid. With the rate at `0` (the default), those columns are omitted.
+
+`invoice show` includes the same set-aside and take-home figures — a preview
+for open invoices, frozen amounts for paid ones.
+
 ## Invoice numbering
 
 Numbers come from the `invoice.number_format` template — default
@@ -109,14 +119,17 @@ only what's billed.
 
 ## Invoices in the TUI
 
-Screen `5` lists invoices with status pills:
+Screen `5` lists invoices with status pills. When a tax set-aside rate is
+configured, the table also shows **est. tax** and **take-home** columns (dim
+for unpaid previews, normal for paid). The detail modal (`o`) includes the same
+estimates in its summary line.
 
 ![Invoices list](../assets/screenshots/invoices-list.svg)
 
 | Key | Action |
 | --- | --- |
 | `n` | new invoice (pick client, live-preview period) |
-| `o` | open line-item detail |
+| `o` | open line-item detail (with est. tax / take-home when configured) |
 | `m` | preview the Markdown render |
 | `e` | render PDF + Markdown files |
 | `t` / `p` / `v` | mark sent / paid / void |
