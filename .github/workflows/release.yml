@@ -157,7 +157,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
 
   github-release:
-    needs: publish
+    needs: [release, publish]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/create-github-app-token@v1
