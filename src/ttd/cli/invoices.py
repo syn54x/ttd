@@ -20,7 +20,7 @@ from ttd.invoicing.pdf import render_pdf
 from ttd.reporting import periods
 from ttd.services import invoicing as svc
 from ttd.services import taxes as taxes_svc
-from ttd.storage.models import enum_value
+from ttd.storage.models import Invoice, enum_value
 
 app = TtdApp(name="invoice", help="Create and manage invoices.")
 
@@ -29,6 +29,19 @@ STATUS_STYLE = {"draft": "muted", "sent": "warn", "paid": "ok", "void": "err"}
 
 def _status_pill(status: str) -> str:
     return f"[{STATUS_STYLE.get(status, 'muted')}]{status}[/]"
+
+
+def _estimate_cells(invoice: Invoice, estimate: taxes_svc.InvoiceEstimate | None) -> list[str]:
+    """``Est. Tax`` and ``Take-Home`` cells; unpaid previews render muted."""
+    if estimate is None:
+        return ["[muted]—[/muted]", "[muted]—[/muted]"]
+    cells = [
+        format_money(estimate.set_aside, invoice.currency),
+        format_money(estimate.take_home, invoice.currency),
+    ]
+    if enum_value(invoice.status) != "paid":  # not frozen yet — current-rate preview
+        cells = [f"[muted]{cell}[/muted]" for cell in cells]
+    return cells
 
 
 def _parse_date(raw: str, what: str) -> date:
@@ -89,7 +102,8 @@ def _print_draft(draft: svc.Draft) -> None:
         preview = compute_set_aside(draft.subtotal, rate)
         console.print(
             f"[muted]Set aside at {format_rate(rate)} when paid: "
-            f"{format_money(preview, currency)}[/muted]"
+            f"{format_money(preview, currency)} · take-home "
+            f"{format_money(draft.subtotal - preview, currency)}[/muted]"
         )
 
 
@@ -171,15 +185,23 @@ async def list_() -> None:
     if not rows:
         console.print("[muted]No invoices yet — `ttd invoice create --client SLUG`[/muted]")
         return
-    t = table("Number", "Client", "Period", "Total", "Status")
-    for invoice, client in rows:
-        t.add_row(
+    rate = get_settings().tax.set_aside_rate
+    estimates = [taxes_svc.estimate_invoice(invoice, rate) for invoice, _ in rows]
+    show_tax = any(e is not None for e in estimates)
+    headers = ["Number", "Client", "Period", "Total"]
+    if show_tax:
+        headers += ["Est. Tax", "Take-Home"]
+    t = table(*headers, "Status")
+    for (invoice, client), estimate in zip(rows, estimates, strict=True):
+        row = [
             invoice.number,
             client.slug,
             f"{invoice.period_start:%b %-d} – {invoice.period_end:%b %-d %Y}",
             format_money(invoice.total, invoice.currency),
-            _status_pill(enum_value(invoice.status)),
-        )
+        ]
+        if show_tax:
+            row += _estimate_cells(invoice, estimate)
+        t.add_row(*row, _status_pill(enum_value(invoice.status)))
     console.print(t)
 
 
@@ -212,13 +234,15 @@ async def show(number: str) -> None:
         if set_aside:
             console.print(
                 f"Set aside ({format_rate(rate)}): "
-                f"{format_money(set_aside, invoice.currency)} · paid {paid_on}"
+                f"{format_money(set_aside, invoice.currency)} · take-home "
+                f"{format_money(invoice.subtotal - set_aside, invoice.currency)} · paid {paid_on}"
             )
     elif settings.tax.set_aside_rate > 0 and enum_value(invoice.status) != "void":
         preview = compute_set_aside(invoice.subtotal, settings.tax.set_aside_rate)
         console.print(
             f"[muted]Set aside at {format_rate(settings.tax.set_aside_rate)} when paid: "
-            f"{format_money(preview, invoice.currency)}[/muted]"
+            f"{format_money(preview, invoice.currency)} · take-home "
+            f"{format_money(invoice.subtotal - preview, invoice.currency)}[/muted]"
         )
 
 

@@ -17,11 +17,25 @@ from ttd.invoicing.markdown import render_markdown, write_markdown
 from ttd.invoicing.pdf import render_pdf
 from ttd.reporting import periods
 from ttd.services import invoicing as svc
-from ttd.storage.models import Client, enum_value
+from ttd.services import taxes as taxes_svc
+from ttd.storage.models import Client, Invoice, enum_value
 from ttd.tui.screens._base import TtdScreen
 from ttd.tui.widgets.modals import ConfirmModal, PickerModal
 
 PILL = {"draft": "dim", "sent": "#ffcf5c", "paid": "#3fcf8e", "void": "#ff5c5c"}
+
+
+def _estimate_cells(invoice: Invoice, estimate: taxes_svc.InvoiceEstimate | None) -> list[str]:
+    """``est. tax`` and ``take-home`` cells; unpaid previews render dim."""
+    if estimate is None:
+        return ["[dim]—[/dim]", "[dim]—[/dim]"]
+    cells = [
+        format_money(estimate.set_aside, invoice.currency),
+        format_money(estimate.take_home, invoice.currency),
+    ]
+    if enum_value(invoice.status) != "paid":  # not frozen yet — current-rate preview
+        cells = [f"[dim]{cell}[/dim]" for cell in cells]
+    return cells
 
 
 class InvoiceDetailModal(ModalScreen[None]):
@@ -51,10 +65,17 @@ class InvoiceDetailModal(ModalScreen[None]):
                     format_money(line.amount, invoice.currency),
                 )
             yield table
-            yield Label(
+            summary = (
                 f"issued {invoice.issued_date} · due {invoice.due_date or 'on receipt'} · "
                 f"[bold]{format_money(invoice.total, invoice.currency)}[/bold]"
             )
+            estimate = taxes_svc.estimate_invoice(invoice, get_settings().tax.set_aside_rate)
+            if estimate is not None:
+                summary += (
+                    f" · est. tax {format_money(estimate.set_aside, invoice.currency)}"
+                    f" · take-home {format_money(estimate.take_home, invoice.currency)}"
+                )
+            yield Label(summary)
             yield Button("close (esc)", id="close")
 
     def on_button_pressed(self) -> None:
@@ -197,23 +218,34 @@ class InvoicesScreen(TtdScreen):
             yield Label("", id="invoice-help", classes="muted")
 
     def setup(self) -> None:
-        table = self.query_one("#invoice-table", DataTable)
-        table.add_columns("number", "client", "period", "total", "status")
+        self._table_columns: tuple[str, ...] = ()
 
     async def render_data(self) -> None:
         rows = await svc.list_invoices()
+        rate = get_settings().tax.set_aside_rate
+        estimates = [taxes_svc.estimate_invoice(invoice, rate) for invoice, _ in rows]
+
+        columns = ("number", "client", "period", "total", "status")
+        if any(e is not None for e in estimates):
+            columns = ("number", "client", "period", "total", "est. tax", "take-home", "status")
         table = self.query_one("#invoice-table", DataTable)
+        if columns != self._table_columns:
+            table.clear(columns=True)
+            table.add_columns(*columns)
+            self._table_columns = columns
         table.clear()
-        for invoice, client in rows:
+        for (invoice, client), estimate in zip(rows, estimates, strict=True):
             status = enum_value(invoice.status)
-            table.add_row(
+            row = [
                 invoice.number,
                 client.slug,
                 f"{invoice.period_start:%b %-d} – {invoice.period_end:%b %-d %Y}",
                 format_money(invoice.total, invoice.currency),
-                f"[{PILL.get(status, 'dim')}]{status}[/]",
-                key=invoice.number,
-            )
+            ]
+            if "est. tax" in columns:
+                row += _estimate_cells(invoice, estimate)
+            row.append(f"[{PILL.get(status, 'dim')}]{status}[/]")
+            table.add_row(*row, key=invoice.number)
         self.query_one("#invoice-help", Label).update(
             f"{len(rows)} invoice{'s' if len(rows) != 1 else ''}   "
             "[dim]n new · o detail · m preview md · e render · t sent · p paid · v void[/dim]"

@@ -53,8 +53,10 @@ heat strips. Keys: `w`/`m` mode, `[` `]` paging.
 ## Invoices
 
 Screen `5`. Every invoice with its status pill; create, inspect, render, and
-advance them without leaving the screen. Keys: `n` new, `o` detail, `m`
-markdown preview, `e` render files, `t` sent, `p` paid, `v` void.
+advance them without leaving the screen. When `tax.set_aside_rate` is set, the
+list adds **est. tax** and **take-home** columns (dim until the invoice is
+paid), and the detail modal shows the same figures. Keys: `n` new, `o` detail,
+`m` markdown preview, `e` render files, `t` sent, `p` paid, `v` void.
 
 ![Invoices](../assets/screenshots/invoices-list.svg)
 

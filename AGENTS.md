@@ -78,6 +78,33 @@ What this means in practice:
 This rule binds human contributors and AI agents equally, and overrides any
 agent default that biases toward minimal or expedient changes.
 
+## Documentation
+
+User-facing docs live in `docs/pages/` (Zensical site). **Ship doc updates in
+the same change** when behavior users read about changes.
+
+**Already automated — do not hand-edit:**
+
+- `docs/pages/reference/cli/` — generated from cyclopts (`just docs-cli`; prek
+  `cli-docs` on commit)
+- Configuration reference — rendered from Pydantic schema docstrings
+- Site build — prek `zensical-build` and CI catch broken links and build errors
+
+**Update guides in the same PR when you change:**
+
+- CLI output (table columns, labels, previews) → `docs/pages/guides/` and
+  cyclopts command docstrings when the reference should describe behavior
+- TUI screens, columns, or modals → matching guide(s); run `just docs-shots` when
+  committed screenshots should reflect the new UI
+- Config keys or semantics → schema docstrings first; guides when users need
+  workflow context
+
+Prefer tests that assert key output strings (labels, columns) so review can
+spot guide drift. Do not add planning or design markdown under `docs/pages/` —
+CE artifacts belong in repo-root `brainstorms/` and `plans/`; internal design
+notes stay in `docs/design/`. See `docs/pages/contributing.md` for the full
+docs workflow.
+
 ## Conventions
 
 - Python 3.13+, uv, ruff, ty, pytest + Hypothesis for billing-sensitive invariants; TUI snapshot tests via pytest-textual-snapshot

@@ -24,6 +24,16 @@ The amount and the rate used are frozen onto that invoice, so changing
 what actually moved to your savings account. Re-marking with a corrected
 `--paid-date` re-files the set-aside into the right quarter.
 
+## Per-invoice estimates
+
+With a rate configured, [`invoice list`](invoicing.md#reviewing-invoices) and
+[`invoice show`](invoicing.md#reviewing-invoices) surface **est. tax** and
+**take-home** for each invoice — subtotal minus set-aside. Draft and sent
+invoices preview at the current `tax.set_aside_rate` (muted in the CLI, dim in
+the TUI); paid invoices always show the frozen snapshot from mark-paid, even if
+you change the rate later. Void invoices and a `0` rate omit the columns
+entirely.
+
 ## Estimated-tax quarters
 
 ttd uses the IRS estimated-tax calendar (note the uneven windows):

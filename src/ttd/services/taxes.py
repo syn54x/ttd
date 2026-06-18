@@ -27,6 +27,42 @@ class QuarterSummary:
     payment_count: int
 
 
+@dataclass
+class InvoiceEstimate:
+    """Estimated tax and take-home for one invoice.
+
+    Both are based on the subtotal — invoice sales tax is pass-through money,
+    not income.
+    """
+
+    set_aside: Decimal
+    take_home: Decimal  # subtotal - set_aside
+
+
+def estimate_invoice(invoice: Invoice, fallback_rate: Decimal) -> InvoiceEstimate | None:
+    """Per-invoice set-aside estimate, or ``None`` when there is nothing to show.
+
+    Paid invoices use their frozen snapshot; everything else previews at the
+    current configured rate. Void invoices and 0% rates yield ``None`` — for
+    those rows the feature is off, not zero.
+    """
+    status = enum_value(invoice.status)
+    if status == InvoiceStatus.VOID.value:
+        return None
+    if (
+        status == InvoiceStatus.PAID.value
+        and invoice.set_aside is not None
+        and invoice.set_aside_rate is not None
+    ):
+        if invoice.set_aside_rate == 0:
+            return None
+        return InvoiceEstimate(invoice.set_aside, invoice.subtotal - invoice.set_aside)
+    if fallback_rate <= 0:
+        return None
+    set_aside = compute_set_aside(invoice.subtotal, fallback_rate)
+    return InvoiceEstimate(set_aside, invoice.subtotal - set_aside)
+
+
 def paid_facts(invoice: Invoice, fallback_rate: Decimal) -> tuple[date, Decimal, Decimal]:
     """``(paid_date, rate, set_aside)`` for a paid invoice.
 
