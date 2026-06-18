@@ -99,3 +99,42 @@ def test_invoiced_entries_locked_via_cli(isolated_config):
     # void releases them
     runner.invoke(app, ["invoice", "mark", "2026-001", "void"])
     assert runner.invoke(app, ["entry", "rm", uid]).exit_code == 0
+
+
+def test_invoice_create_with_period_spec(isolated_config):
+    _seed(isolated_config)
+    result = runner.invoke(
+        app, ["invoice", "create", "--client", "acme", "--period", "this month", "--dry-run"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "Dry run" in result.output
+    assert "600.00" in result.output
+
+
+def test_invoice_create_period_conflicts(isolated_config):
+    _seed(isolated_config)
+    result = runner.invoke(
+        app,
+        [
+            "invoice",
+            "create",
+            "--client",
+            "acme",
+            "--period",
+            "this month",
+            "--month",
+            "2026-06",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "--period alone" in result.output
+
+
+def test_invoice_show_markdown_format(isolated_config):
+    _seed(isolated_config)
+    runner.invoke(app, ["invoice", "create", "--client", "acme", "--month", "2026-06"])
+    result = runner.invoke(app, ["invoice", "show", "2026-001", "--format", "md"])
+    assert result.exit_code == 0, result.output
+    assert "# Invoice 2026-001" in result.output
+    assert "API" in result.output

@@ -85,3 +85,19 @@ def test_report_by_rejects_unknown(isolated_config):
     _seed()
     result = runner.invoke(app, ["report", "week", "--by", "banana"])
     assert result.exit_code == 1
+
+
+def test_report_week_with_entries(isolated_config):
+    _seed()
+    result = runner.invoke(app, ["report", "week", "--entries"])
+    assert result.exit_code == 0, result.output
+    assert "acme/api" in result.output
+    assert "sync" in result.output
+    assert "Total" in result.output
+
+
+def test_report_entries_requires_by_project(isolated_config):
+    _seed()
+    result = runner.invoke(app, ["report", "week", "--entries", "--by", "client"])
+    assert result.exit_code == 1
+    assert "--entries requires --by project" in result.output

@@ -39,7 +39,7 @@ Stop the running timer and log the entry.
 ttd status
 ```
 
-Show the running timer and today's total.
+Running timer, today's total, this week, and unbilled billable value.
 
 ## cancel
 

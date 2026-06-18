@@ -179,6 +179,27 @@ async def test_reports_screen_modes(seeded_app):
         )
 
 
+async def test_reports_project_expand_collapse(seeded_app):
+    async with seeded_app.run_test(size=(120, 40)) as pilot:
+        await pilot.press("4")
+        await pilot.pause()
+        screen = seeded_app.screen
+        table = screen.query_one("#report-table")
+        table.focus()
+        initial = table.row_count
+        assert initial >= 1
+        await screen.action_toggle_expand()
+        await pilot.pause()
+        expanded = table.row_count
+        assert expanded > initial
+        await screen.action_toggle_expand()
+        await pilot.pause()
+        assert table.row_count == initial
+        await pilot.press("m")
+        await pilot.pause()
+        assert table.row_count <= initial
+
+
 async def test_reports_screen_tax_columns(seeded_app, monkeypatch):
     monkeypatch.setenv("TTD_TAX__SET_ASIDE_RATE", "0.32")
     async with seeded_app.run_test(size=(140, 40)) as pilot:

@@ -4,11 +4,12 @@ from typing import Annotated
 
 from cyclopts import Parameter
 from pydantic import BaseModel, Field
+from rich.prompt import Confirm
 
 from ttd.cli._interactive import interactive_fill
 from ttd.cli._output import console, success, table
 from ttd.cli._pickers import client_choices, validate_money
-from ttd.cli._run import TtdApp, with_db
+from ttd.cli._run import TtdApp, abort, with_db
 from ttd.config.loader import get_settings
 from ttd.core.errors import TtdError
 from ttd.core.money import format_hours, format_money, parse_money
@@ -142,3 +143,20 @@ async def archive(
     """Archive a project."""
     project = await svc.archive_project(slug, client)
     success(f"Archived project {project.slug}")
+
+
+@app.command(name="rm")
+@with_db
+async def rm(
+    slug: str,
+    *,
+    client: ClientOpt = None,
+    force: Annotated[bool, Parameter(help="Also delete the project's entries")] = False,
+) -> None:
+    """Delete a project. Refuses if it has entries unless --force."""
+    client_slug = _default_client(client)
+    label = f"{client_slug}/{slug}"
+    if force and not Confirm.ask(f"Delete project '{label}' and ALL its entries?"):
+        abort()
+    await svc.delete_project(slug, client_slug, force=force)
+    success(f"Deleted project {label}")

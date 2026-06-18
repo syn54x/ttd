@@ -45,6 +45,7 @@ This (or last) week.
 * `--project, -p`:
 * `--client`:
 * `--by`: Group rows by: day|project|client  *\[default: project\]*
+* `--entries, --no-entries`: Show individual entries under each project  *\[default: False\]*
 
 ## report month
 
@@ -61,6 +62,7 @@ A calendar month.
 * `--project, -p`:
 * `--client`:
 * `--by`: Group rows by: day|project|client  *\[default: project\]*
+* `--entries, --no-entries`: Show individual entries under each project  *\[default: False\]*
 
 ## report range
 
@@ -77,3 +79,4 @@ An arbitrary date range.
 * `--project, -p`:
 * `--client`:
 * `--by`: Group rows by: day|project|client  *\[default: project\]*
+* `--entries, --no-entries`: Show individual entries under each project  *\[default: False\]*

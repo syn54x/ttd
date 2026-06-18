@@ -40,6 +40,18 @@ $ ttd report week --by day
 Project and client groupings include days-active counts and an activity heat
 strip — one colored cell per day, brighter meaning more hours.
 
+## Entry drill-down
+
+See the individual entries behind each project rollup:
+
+```console
+$ ttd report week --entries
+$ ttd report month --entries -p api-rewrite
+```
+
+Requires the default `--by project` grouping. Entry lines appear indented
+under each project row with date, time, hours, note, and per-entry value.
+
 ## Reports in the TUI
 
 Screen `4` shows the same rollups with a bar chart of the period's days:
@@ -50,6 +62,9 @@ Screen `4` shows the same rollups with a bar chart of the period's days:
 | --- | --- |
 | `w` / `m` | week / month mode |
 | `[` / `]` | older / newer period |
+| `Enter` | expand / collapse entries under the focused project |
+
+Entry sub-rows are read-only — edit on Timesheet (`2`) or with `ttd entry edit`.
 
 Rows without a configured rate show `—` in the value column — set one at the
 project, client, or `business.default_hourly_rate` level.
