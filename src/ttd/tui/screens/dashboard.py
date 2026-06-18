@@ -31,7 +31,14 @@ class DashboardScreen(TtdScreen):
     def setup(self) -> None:
         table = self.query_one("#today-table", DataTable)
         table.add_columns("project", "time", "hours", "note")
-        self.set_interval(1.0, self._tick)
+        self._tick_timer = self.set_interval(1.0, self._tick)
+
+    async def on_screen_suspend(self) -> None:
+        self._tick_timer.pause()
+
+    async def on_screen_resume(self) -> None:
+        self._tick_timer.resume()
+        await super().on_screen_resume()
 
     async def _tick(self) -> None:
         status = await timer_svc.timer_status(now=datetime.now())
