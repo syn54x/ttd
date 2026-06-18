@@ -20,11 +20,17 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/ttd-ledger
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Verify release token is configured
+        run: |
+          if [ -z "${{ secrets.GH_TOKEN }}" ]; then
+            echo "::error::GH_TOKEN is not available to this workflow. Grant the org secret to syn54x/ttd."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           # Org PAT (bypasses branch protection for cz bump push to main).
@@ -108,19 +114,64 @@ jobs:
           git push origin main
           git push origin "${TAG}"
 
+      - id: tag
+        run: echo "tag=$(git describe --tags --abbrev=0 --match 'v*')" >> "$GITHUB_OUTPUT"
+
       - name: Build package
         run: uv build
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-dist
+          path: dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-body
+          path: release-body.md
+
+  publish:
+    needs: release
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/ttd-ledger
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-dist
+          path: dist/
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify release token is configured
+        run: |
+          if [ -z "${{ secrets.GH_TOKEN }}" ]; then
+            echo "::error::GH_TOKEN is not available to this workflow. Grant the org secret to syn54x/ttd."
+            exit 1
+          fi
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-dist
+          path: dist/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-body
+          path: .
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          TAG=$(git describe --tags --abbrev=0 --match 'v*')
-          gh release create "${TAG}" \
-            --title "${TAG}" \
+          gh release create "${{ needs.release.outputs.tag }}" \
+            --title "${{ needs.release.outputs.tag }}" \
             --notes-file release-body.md \
             dist/*.tar.gz dist/*.whl
 
@@ -131,7 +182,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: main
           fetch-depth: 0
@@ -147,11 +198,9 @@ jobs:
       - name: Build documentation
         run: uv run zensical build --clean
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
-      - name: Deploy to GitHub Pages
-        id: deployment
+      - id: deployment
         uses: actions/deploy-pages@v4
