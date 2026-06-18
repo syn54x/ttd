@@ -117,6 +117,28 @@ A project-day totalling **1h07m** bills as **1h00m** with `nearest`, **1h15m**
 with `up`, and exactly **1h07m** with `none`. What you log is never changed —
 only what's billed.
 
+## Refreshing an invoice
+
+Recompute an existing invoice from its **locked entries** using current billing
+rules, rates, tax config, and description logic (including entry notes). Preview
+shows a before/after diff; nothing changes until you confirm.
+
+```console
+$ ttd invoice refresh 2026-001              # print diff
+$ ttd invoice refresh 2026-001 --apply      # apply when allowed
+```
+
+| Status | Preview | Apply |
+| --- | --- | --- |
+| `void` | Blocked | — |
+| `draft`, `sent` | Full recalc diff | Updates lines and invoice totals |
+| `paid` | Full recalc diff | **Descriptions only** — apply is blocked when totals or line amounts would change |
+
+Paid invoices never update `set_aside`, `paid_date`, or header totals. To change
+billing on a paid invoice, void it and re-invoice.
+
+Refresh does **not** pull in new uninvoiced entries or edit locked entry data.
+
 ## Invoices in the TUI
 
 Screen `5` lists invoices with status pills. When a tax set-aside rate is
@@ -130,6 +152,7 @@ estimates in its summary line.
 | --- | --- |
 | `n` | new invoice (pick client, live-preview period) |
 | `o` | open line-item detail (with est. tax / take-home when configured) |
+| `u` | refresh — recompute from locked entries (before/after diff) |
 | `m` | preview the Markdown render |
 | `e` | render PDF + Markdown files |
 | `t` / `p` / `v` | mark sent / paid / void |

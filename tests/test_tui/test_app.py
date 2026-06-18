@@ -13,6 +13,8 @@ from ttd.services import projects as project_svc
 from ttd.services import timer as timer_svc
 from ttd.storage.db import close_db, init_db
 from ttd.tui.app import TtdApp
+from ttd.tui.theme import THEME_DARK, THEME_LIGHT
+from ttd.tui.widgets.modals import ConfirmModal
 
 NOW = datetime.now().replace(hour=15, minute=0, second=0, microsecond=0)
 
@@ -595,3 +597,114 @@ async def test_taxes_screen_shows_quarters_and_payment_modal(seeded_app):
         await pilot.press("escape")
         await pilot.pause()
         assert seeded_app.screen.nav_id == "taxes"
+
+
+async def test_t_key_opens_theme_picker(seeded_app):
+    from ttd.tui.widgets.theme_picker import ThemePickerModal
+
+    async with seeded_app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("t")
+        await pilot.pause()
+        assert isinstance(seeded_app.screen, ThemePickerModal)
+
+
+async def test_t_key_save_theme(seeded_app):
+    from ttd.config.loader import get_settings
+    from ttd.tui.widgets.theme_picker import ThemePickerModal
+
+    async with seeded_app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("t")
+        await pilot.pause()
+        assert isinstance(seeded_app.screen, ThemePickerModal)
+        await pilot.press(*list("ttd-light"))
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.press("y")
+        await pilot.pause()
+        assert get_settings().display.theme == THEME_LIGHT
+        assert seeded_app.screen.nav_id == "dashboard"
+
+
+async def test_palette_theme_previews_and_reverts(seeded_app):
+    from ttd.tui.widgets.theme_picker import ThemePickerModal
+
+    async with seeded_app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        assert seeded_app.theme == THEME_DARK
+        seeded_app.search_themes()
+        await pilot.pause()
+        assert isinstance(seeded_app.screen, ThemePickerModal)
+        await pilot.press(*list("ttd-light"))
+        await pilot.pause()
+        assert seeded_app.theme == THEME_LIGHT
+        await pilot.press("escape")
+        await pilot.pause()
+        assert seeded_app.theme == THEME_DARK
+        assert seeded_app.screen.nav_id == "dashboard"
+
+
+async def test_palette_theme_arrow_navigation(seeded_app):
+    from ttd.tui.widgets.theme_picker import ThemePickerModal
+
+    async with seeded_app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        assert seeded_app.theme == THEME_DARK
+        seeded_app.search_themes()
+        await pilot.pause()
+        assert isinstance(seeded_app.screen, ThemePickerModal)
+        light_names = sorted(
+            name for name, theme in seeded_app.available_themes.items() if not theme.dark
+        )
+        await pilot.press("down")  # ttd-dark is last in dark; next is first light theme
+        await pilot.pause()
+        assert seeded_app.theme == light_names[0]
+
+
+async def test_palette_theme_groups_dark_and_light(seeded_app):
+    from ttd.tui.widgets.theme_picker import ThemePickerModal
+
+    async with seeded_app.run_test(size=(120, 40)) as pilot:
+        seeded_app.search_themes()
+        await pilot.pause()
+        modal = seeded_app.screen
+        assert isinstance(modal, ThemePickerModal)
+        theme_list = modal.query_one("#theme-list")
+        labels = [str(option.prompt) for option in theme_list.options]
+        assert "dark" in labels
+        assert "light" in labels
+        assert labels.index("dark") < labels.index(THEME_DARK)
+        assert labels.index("light") < labels.index(THEME_LIGHT)
+
+
+async def test_palette_theme_save_non_ttd_theme(seeded_app):
+    from ttd.config.loader import get_settings
+
+    async with seeded_app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        seeded_app.search_themes()
+        await pilot.pause()
+        await pilot.press(*list("dracula"))
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.press("y")
+        await pilot.pause()
+        assert get_settings().display.theme == "dracula"
+        assert seeded_app.screen.nav_id == "dashboard"
+
+
+async def test_palette_theme_applies_on_select(seeded_app):
+    async with seeded_app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        seeded_app.search_themes()
+        await pilot.pause()
+        await pilot.press(*list("ttd-light"))
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(seeded_app.screen, ConfirmModal)
+        assert seeded_app.theme == THEME_LIGHT
+        await pilot.press("escape")  # session-only
+        await pilot.pause()
+        assert seeded_app.theme == THEME_LIGHT
+        assert seeded_app.screen.nav_id == "dashboard"

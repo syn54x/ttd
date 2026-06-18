@@ -15,6 +15,7 @@ Create and manage invoices.
 * [`create`](#invoice-create): Invoice a client's uninvoiced billable work (defaults to last month).
 * [`list`](#invoice-list): List invoices, newest first.
 * [`mark`](#invoice-mark): Update invoice status; void releases its entries for re-invoicing.
+* [`refresh`](#invoice-refresh): Recompute invoice lines from locked entries and show a before/after diff.
 * [`render`](#invoice-render): (Re)render an invoice's PDF/Markdown files.
 * [`show`](#invoice-show): Show one invoice with line items.
 
@@ -73,6 +74,19 @@ ttd invoice render [OPTIONS] NUMBER
 * `--pdf, --no-pdf`:   *\[default: False\]*
 * `--md, --no-md`:   *\[default: False\]*
 * `--out`:
+
+## invoice refresh
+
+```console
+ttd invoice refresh [OPTIONS] NUMBER
+```
+
+Recompute invoice lines from locked entries and show a before/after diff.
+
+**Parameters**:
+
+* `NUMBER, --number`:   **\[required\]**
+* `--apply, --no-apply`: Apply changes when allowed  *\[default: False\]*
 
 ## invoice mark
 

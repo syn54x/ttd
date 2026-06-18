@@ -28,6 +28,29 @@ uv run ttd             # bare ttd launches the TUI
 
 **Done means green:** run `just check` and fix failures before handoff. See `.cursor/rules/quality-gate.mdc`.
 
+## Production ledger backup
+
+Taylor uses TTD with real data. **Before implementing features or other data-touching work**, run `just backup` and note the backup path. See `.cursor/rules/production-data-backup.mdc`.
+
+## Branching
+
+Branch from `main`. Name branches with a conventional-commit prefix and a short kebab-case slug:
+
+| Prefix | Use for |
+|--------|---------|
+| `feat/` | New user-facing behavior or capability |
+| `fix/` | Bug fixes |
+| `refactor/` | Internal restructuring without intended behavior change |
+| `docs/` | Documentation-only changes |
+| `chore/` | Tooling, CI, dependencies, repo hygiene |
+| `test/` | Test-only changes |
+
+Examples: `feat/tax-set-aside`, `fix/invoice-rounding`, `docs/roadmap-m1-m2-done`.
+
+- One logical change per branch; open a PR back to `main`.
+- Match the prefix to the branch's primary intent (same types as conventional commits / PR titles).
+- Do not push feature work directly to `main`.
+
 ## Dependency management (uv)
 
 - Use **uv**, not `pip install` / ad-hoc virtualenvs.

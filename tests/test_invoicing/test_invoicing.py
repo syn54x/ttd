@@ -12,6 +12,8 @@ from ttd.services import clients as client_svc
 from ttd.services import entries as entry_svc
 from ttd.services import invoicing as svc
 from ttd.services import projects as project_svc
+from ttd.services.invoicing import PAID_REFRESH_BLOCKED
+from ttd.storage.models import InvoiceLine
 
 NOW = datetime(2026, 6, 9, 15, 0)
 JUNE = month_period(date(2026, 6, 9))
@@ -77,6 +79,27 @@ async def test_draft_requires_rate(db):
 async def test_draft_empty_period_errors(seeded):
     with pytest.raises(TtdError, match="No uninvoiced billable entries"):
         await svc.build_draft("acme", month_period(date(2026, 1, 1)), SETTINGS)
+
+
+async def test_draft_line_includes_entry_notes(db):
+    await client_svc.create_client("Acme", hourly_rate=Decimal("150"))
+    await project_svc.create_project("API", "acme")
+    await entry_svc.log_entry("2026-06-08 9am to 11am", "api", now=NOW, note="API design")
+    await entry_svc.log_entry("2026-06-08 1pm to 2pm", "api", now=NOW, note="Code review")
+    draft = await svc.build_draft("acme", JUNE, SETTINGS)
+    assert len(draft.lines) == 1
+    assert draft.lines[0].description == "API — 2 entries\n- API design\n- Code review"
+
+
+async def test_draft_line_without_notes_unchanged(seeded):
+    draft = await svc.build_draft("acme", JUNE, SETTINGS)
+    assert draft.lines[0].description == "API — 2 entries"
+
+
+def test_flatten_line_description_shows_notes():
+    text = "API — 2 entries\n- Design\n- Review"
+    assert svc.flatten_line_description(text) == "API — 2 entries · - Design · - Review"
+    assert svc.flatten_line_description("API — 2 entries") == "API — 2 entries"
 
 
 # --- persistence -------------------------------------------------------------
@@ -165,6 +188,18 @@ async def test_markdown_snapshot(seeded):
     assert "Payment due within 30 days" in md
 
 
+async def test_markdown_renders_multiline_notes(db):
+    await client_svc.create_client("Acme", hourly_rate=Decimal("150"))
+    await project_svc.create_project("API", "acme")
+    await entry_svc.log_entry("2026-06-08 9am to 11am", "api", now=NOW, note="Design")
+    await entry_svc.log_entry("2026-06-08 1pm to 2pm", "api", now=NOW, note="Review")
+    draft = await svc.build_draft("acme", JUNE, SETTINGS)
+    invoice = await svc.persist_draft(draft, SETTINGS, now=NOW)
+    view = await svc.get_invoice(invoice.number)
+    md = render_markdown(view, SETTINGS)
+    assert "API — 2 entries\n- Design\n- Review" in md
+
+
 async def test_set_aside_never_reaches_client_renders(seeded, tmp_path):
     """The tax set-aside is internal — it must not leak onto client invoices."""
     from ttd.invoicing.pdf import render_pdf
@@ -189,3 +224,122 @@ async def test_pdf_smoke(seeded, tmp_path):
     assert data.startswith(b"%PDF-")
     assert len(data) > 1500
     assert b"/Page" in data
+
+
+async def test_pdf_with_entry_notes(db, tmp_path):
+    from ttd.invoicing.pdf import render_pdf
+
+    await client_svc.create_client("Acme", hourly_rate=Decimal("150"))
+    await project_svc.create_project("API", "acme")
+    await entry_svc.log_entry("2026-06-08 9am to 11am", "api", now=NOW, note="Design work")
+    draft = await svc.build_draft("acme", JUNE, SETTINGS)
+    invoice = await svc.persist_draft(draft, SETTINGS, now=NOW)
+    view = await svc.get_invoice(invoice.number)
+    out = render_pdf(view, SETTINGS, tmp_path / "invoice-with-notes.pdf")
+    assert out.read_bytes().startswith(b"%PDF-")
+
+
+# --- refresh ---------------------------------------------------------------
+
+
+async def _legacy_line_descriptions(invoice_id) -> None:
+    """Strip notes from stored lines to simulate pre-notes invoices."""
+    for line in await InvoiceLine.where(lambda li: li.invoice_id == invoice_id).all():
+        line.description = line.description.splitlines()[0]
+        await line.save()
+
+
+async def test_refresh_updates_descriptions_from_notes(db):
+    await client_svc.create_client("Acme", hourly_rate=Decimal("150"))
+    await project_svc.create_project("API", "acme")
+    await entry_svc.log_entry("2026-06-08 9am to 11am", "api", now=NOW, note="Design")
+    await entry_svc.log_entry("2026-06-08 1pm to 2pm", "api", now=NOW, note="Review")
+    draft = await svc.build_draft("acme", JUNE, SETTINGS)
+    invoice = await svc.persist_draft(draft, SETTINGS, now=NOW)
+    await _legacy_line_descriptions(invoice.id)
+
+    preview = await svc.preview_refresh(invoice.number, SETTINGS)
+    expected = "API — 2 entries\n- Design\n- Review"
+    assert preview.has_changes and preview.can_apply
+    assert preview.lines[0].changed == frozenset({"description"})
+    assert preview.lines[0].after.description == expected
+
+    await svc.apply_refresh(invoice.number, preview, SETTINGS)
+    view = await svc.get_invoice(invoice.number)
+    assert view.lines[0].description == expected
+
+
+async def test_refresh_recalcs_totals_when_rate_changes(seeded):
+    draft = await svc.build_draft("acme", JUNE, SETTINGS)
+    invoice = await svc.persist_draft(draft, SETTINGS, now=NOW)
+    await client_svc.update_client("acme", hourly_rate=Decimal("200"))
+
+    preview = await svc.preview_refresh(invoice.number, SETTINGS)
+    assert preview.totals_changed and preview.can_apply
+    assert preview.after_total > preview.before_total
+
+    await svc.apply_refresh(invoice.number, preview, SETTINGS)
+    view = await svc.get_invoice(invoice.number)
+    assert view.invoice.total == preview.after_total
+
+
+async def test_refresh_noop(seeded):
+    draft = await svc.build_draft("acme", JUNE, SETTINGS)
+    invoice = await svc.persist_draft(draft, SETTINGS, now=NOW)
+    preview = await svc.preview_refresh(invoice.number, SETTINGS)
+    assert not preview.has_changes
+    assert not preview.can_apply
+
+
+async def test_refresh_void_rejected(seeded):
+    draft = await svc.build_draft("acme", JUNE, SETTINGS)
+    invoice = await svc.persist_draft(draft, SETTINGS, now=NOW)
+    await svc.mark_invoice(invoice.number, "void")
+    with pytest.raises(ConflictError, match="void"):
+        await svc.preview_refresh(invoice.number, SETTINGS)
+
+
+async def test_refresh_paid_description_only(db):
+    await client_svc.create_client("Acme", hourly_rate=Decimal("150"))
+    await project_svc.create_project("API", "acme")
+    await entry_svc.log_entry("2026-06-08 9am to 11am", "api", now=NOW, note="Design")
+    draft = await svc.build_draft("acme", JUNE, SETTINGS)
+    invoice = await svc.persist_draft(draft, SETTINGS, now=NOW)
+    await svc.mark_invoice(invoice.number, "paid", set_aside_rate=Decimal("0.32"))
+    await _legacy_line_descriptions(invoice.id)
+    before = await svc.get_invoice(invoice.number)
+
+    preview = await svc.preview_refresh(invoice.number, SETTINGS)
+    assert preview.can_apply and not preview.totals_changed
+    await svc.apply_refresh(invoice.number, preview, SETTINGS)
+
+    after = await svc.get_invoice(invoice.number)
+    assert after.invoice.total == before.invoice.total
+    assert after.invoice.set_aside == before.invoice.set_aside
+    assert after.lines[0].description == "API — 1 entry\n- Design"
+
+
+async def test_refresh_paid_blocks_billing_changes(seeded):
+    draft = await svc.build_draft("acme", JUNE, SETTINGS)
+    invoice = await svc.persist_draft(draft, SETTINGS, now=NOW)
+    await svc.mark_invoice(invoice.number, "paid")
+    await client_svc.update_client("acme", hourly_rate=Decimal("200"))
+
+    preview = await svc.preview_refresh(invoice.number, SETTINGS)
+    assert preview.has_changes
+    assert not preview.can_apply
+    assert preview.blocked_reason == PAID_REFRESH_BLOCKED
+    with pytest.raises(TtdError, match="Paid invoices"):
+        await svc.apply_refresh(invoice.number, preview, SETTINGS)
+
+
+async def test_refresh_apply_stale_rejected(seeded):
+    draft = await svc.build_draft("acme", JUNE, SETTINGS)
+    invoice = await svc.persist_draft(draft, SETTINGS, now=NOW)
+    await client_svc.update_client("acme", hourly_rate=Decimal("200"))
+    preview = await svc.preview_refresh(invoice.number, SETTINGS)
+    assert preview.can_apply
+
+    await svc.mark_invoice(invoice.number, "paid")
+    with pytest.raises(TtdError, match="Paid invoices"):
+        await svc.apply_refresh(invoice.number, preview, SETTINGS)

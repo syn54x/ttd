@@ -86,7 +86,7 @@ increment_minutes = 15             # Billing increment in minutes
 [display]
 time_format = "12h"                # 12h | 24h
 week_start = "monday"              # monday | sunday
-theme = "ttd-dark"                 # ttd-dark | ttd-light
+theme = "ttd-dark"                 # any Textual theme name
 
 [parsing]
 workday_start = 7                  # Hour (0-23); disambiguates am/pm in parsed times

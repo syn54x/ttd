@@ -1,0 +1,51 @@
+---
+description: Back up the active TTD ledger before implementing features or other data-touching work
+alwaysApply: true
+---
+
+# Production data backup (required)
+
+Taylor dogfoods TTD with **real ledger data**. Before **implementing** a feature, fix, refactor that touches persistence/services/CLI data paths, migrations, or anything that could mutate the live database, **create a backup first**.
+
+## When to back up
+
+- **Required:** feature/fix/refactor work that changes code under `src/ttd/` (especially `storage/`, `services/`, `cli/`, migrations)
+- **Required:** running destructive CLI against the default db (`db seed-demo --reset`, experimental imports, schema experiments)
+- **Skip:** read-only Q&A, plan/docs-only edits, work confined to tests with an isolated `TTD_DB_PATH`
+
+## Command (run from repo root)
+
+```bash
+just backup
+```
+
+Or explicitly:
+
+```bash
+mkdir -p ~/Backups/ttd
+uv run ttd db path          # note which ledger you are protecting
+uv run ttd db backup ~/Backups/ttd/
+```
+
+This writes `~/Backups/ttd/ttd-YYYYMMDD-HHMMSS.db` (full SQLite copy).
+
+## Agent workflow
+
+1. Run `just backup` **before** the first code change of the task.
+2. If backup prints "No database yet", say so and continue only when the task does not need real data.
+3. If backup succeeds, **record the backup path** in your first implementation update (one line is enough).
+4. Do **not** run `ttd db seed-demo --reset` (or similar) against the default `db_path` — use `TTD_DB_PATH=/tmp/ttd-dev.db` for experiments.
+5. Tests must keep using isolated DB fixtures; never point pytest at the production ledger.
+
+## Restore (full ledger)
+
+```bash
+# Stop TTD/TUI first, then:
+cp ~/Backups/ttd/ttd-YYYYMMDD-HHMMSS.db "$(uv run ttd db path)"
+# Remove stale WAL sidecars if present:
+rm -f "$(uv run ttd db path)-wal" "$(uv run ttd db path)-shm"
+```
+
+JSON export (`ttd export ledger.json`) is a useful **secondary** archive for entries but does **not** replace a `.db` backup (invoices and full graph live in SQLite).
+
+See `docs/pages/guides/data-and-backups.md`.
