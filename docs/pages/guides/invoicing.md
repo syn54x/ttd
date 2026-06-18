@@ -18,8 +18,13 @@ rate is frozen onto the invoice so later rate changes never rewrite history.
 $ ttd invoice create --client acme-corp              # last calendar month
 $ ttd invoice create --client acme-corp --month 2026-05
 $ ttd invoice create --client acme-corp --from 2026-05-15 --to 2026-05-31
+$ ttd invoice create --client acme-corp --period "last month"
+$ ttd invoice create --client acme-corp --period "2026-05-01 to 2026-05-31"
 $ ttd invoice create --client acme-corp --number 2026-CUSTOM-1
 ```
+
+`--period` accepts the same strings as the TUI invoice wizard: `last month`,
+`this month`, `YYYY-MM`, or `YYYY-MM-DD to YYYY-MM-DD`.
 
 `-i` opens a form with a live total preview instead.
 
@@ -74,7 +79,11 @@ are never reused.
 ```console
 $ ttd invoice list            # newest first: number, client, period, total, status
 $ ttd invoice show 2026-001   # line items, dates, subtotal/tax/total, set-aside
+$ ttd invoice show 2026-001 --format md   # rendered Markdown to stdout (preview)
 ```
+
+`invoice show --format md` prints the same Markdown the TUI preview (`m`) shows,
+without writing a file — use `invoice render --md` when you want files on disk.
 
 When `tax.set_aside_rate` is greater than zero, `invoice list` also shows
 **Est. Tax** and **Take-Home** columns. Unpaid invoices preview at the current

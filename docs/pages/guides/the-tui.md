@@ -25,6 +25,8 @@ narrow terminals it wraps onto extra rows rather than hiding shortcuts.
 Screen `1`. The big timer (idle or running), today's entries, the week's
 hours and unbilled value, and a 12-week activity heatmap:
 
+The footer summary matches `ttd status` on the CLI (week hours and unbilled value).
+
 ![Dashboard](../assets/screenshots/dashboard.svg)
 
 ## Timesheet
@@ -46,7 +48,7 @@ unbilled hours. Keys: `a` add client, `p` add project, `e` edit, `x` archive,
 ## Reports
 
 Screen `4`. Weekly or monthly rollups with per-day bar chart and activity
-heat strips. Keys: `w`/`m` mode, `[` `]` paging.
+heat strips. Keys: `w`/`m` mode, `[` `]` paging, `Enter` expand entries.
 
 ![Reports](../assets/screenshots/reports-month.svg)
 

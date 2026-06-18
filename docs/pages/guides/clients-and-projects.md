@@ -53,7 +53,12 @@ $ ttd project list                    # hours logged + unbilled work per project
 $ ttd project list --client acme-corp
 $ ttd project edit api-rewrite --rate 175
 $ ttd project archive api-rewrite
+$ ttd project rm api-rewrite --client acme-corp          # empty project only
+$ ttd project rm api-rewrite --client acme-corp --force # deletes entries too
 ```
+
+Deleting a project with logged entries requires `--force`. Invoiced entries
+block deletion even with `--force` — void the invoice first.
 
 ## How hourly rates resolve
 

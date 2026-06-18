@@ -15,7 +15,7 @@ from ttd.config.loader import get_settings
 from ttd.core.errors import TtdError
 from ttd.core.money import format_hours, format_money
 from ttd.core.taxes import compute_set_aside, format_rate
-from ttd.invoicing.markdown import write_markdown
+from ttd.invoicing.markdown import render_markdown, write_markdown
 from ttd.invoicing.pdf import render_pdf
 from ttd.reporting import periods
 from ttd.services import invoicing as svc
@@ -52,15 +52,21 @@ def _parse_date(raw: str, what: str) -> date:
 
 
 def _resolve_period(
-    month: str | None, date_from: str | None, date_to: str | None
+    month: str | None,
+    date_from: str | None,
+    date_to: str | None,
+    period: str | None = None,
 ) -> periods.Period:
+    if period is not None:
+        if month is not None or date_from is not None or date_to is not None:
+            raise TtdError("Pass --period alone, not with --month or --from/--to")
+        return periods.parse_period(period, datetime.now().date())
     if month is not None:
         return periods.month_period(datetime.now().date(), ym=month)
     if date_from is not None and date_to is not None:
         return periods.range_period(_parse_date(date_from, "--from"), _parse_date(date_to, "--to"))
     if date_from or date_to:
-        raise TtdError("Pass both --from and --to (or use --month)")
-    # default: last calendar month — the usual "invoice my last month" flow
+        raise TtdError("Pass both --from and --to (or use --month or --period)")
     return periods.month_period(datetime.now().date(), last=True)
 
 
@@ -138,6 +144,12 @@ async def create(
     *,
     client: Annotated[str | None, Parameter(help="Client slug")] = None,
     month: Annotated[str | None, Parameter(help="YYYY-MM")] = None,
+    period: Annotated[
+        str | None,
+        Parameter(
+            help="Period spec: 'last month', 'this month', YYYY-MM, or YYYY-MM-DD to YYYY-MM-DD"
+        ),
+    ] = None,
     date_from: Annotated[str | None, Parameter(name="--from")] = None,
     date_to: Annotated[str | None, Parameter(name="--to")] = None,
     number: Annotated[str | None, Parameter(help="Override the number")] = None,
@@ -159,15 +171,15 @@ async def create(
         client, month, pdf, md = data.client, data.month, data.pdf, data.md
     if client is None:
         raise TtdError("--client is required (or use -i for the interactive form)")
-    period = _resolve_period(month, date_from, date_to)
+    period_obj = _resolve_period(month, date_from, date_to, period)
 
-    draft = await svc.build_draft(client, period, settings)
+    draft = await svc.build_draft(client, period_obj, settings)
     view = None
     if not dry_run:
         invoice = await svc.persist_draft(draft, settings, number=number)
         view = await svc.get_invoice(invoice.number)
 
-    console.print(f"\n[bold]{draft.client.name}[/bold] — {period.label}")
+    console.print(f"\n[bold]{draft.client.name}[/bold] — {period_obj.label}")
     _print_draft(draft)
     if dry_run:
         console.print("[muted]Dry run — nothing created.[/muted]")
@@ -207,9 +219,20 @@ async def list_() -> None:
 
 @app.command(name="show")
 @with_db
-async def show(number: str) -> None:
-    """Show one invoice with line items."""
+async def show(
+    number: str,
+    *,
+    format: Annotated[
+        str, Parameter(name="--format", help="Output format: table (default) or md")
+    ] = "table",
+) -> None:
+    """Show one invoice with line items, or rendered Markdown with --format md."""
+    if format not in ("table", "md"):
+        raise TtdError("--format must be table or md")
     view = await svc.get_invoice(number)
+    if format == "md":
+        console.print(render_markdown(view, get_settings()))
+        return
     invoice, client = view.invoice, view.client
     console.print(
         f"\n[bold]Invoice {invoice.number}[/bold]  {_status_pill(enum_value(invoice.status))}"

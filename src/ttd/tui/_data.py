@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from ttd.config.loader import get_settings
 from ttd.core.errors import TtdError
 from ttd.core.money import format_hours, format_money
-from ttd.core.rollup import amount as rollup_amount
+from ttd.reporting.render import entry_time_label
 from ttd.services import entries as entry_svc
 from ttd.services import projects as project_svc
 from ttd.storage.models import Client, Entry, Project, pk
@@ -59,28 +59,16 @@ async def day_rows(day: date) -> list[entry_svc.EntryRow]:
 
 
 async def week_seconds(today: date, week_start: str = "monday") -> int:
-    offset = today.weekday() if week_start == "monday" else (today.weekday() + 1) % 7
-    start = today - timedelta(days=offset)
-    rows = await entry_svc.list_entries(date_from=start, date_to=today)
-    return sum(r.entry.seconds for r in rows)
+    from ttd.services import summary as summary_svc
+
+    return await summary_svc.week_total(today, week_start)
 
 
 async def unbilled_value() -> tuple[int, str]:
     """(total unbilled billable seconds, formatted money across clients)."""
-    rows = await entry_svc.list_entries()
-    settings = get_settings()
-    seconds = 0
-    total = None
-    for r in rows:
-        if r.entry.invoice_id is not None or not r.entry.billable:
-            continue
-        seconds += r.entry.seconds
-        rate = await project_svc.effective_rate(r.project)
-        if rate is None:
-            rate = settings.business.default_hourly_rate
-        value = rollup_amount(r.entry.seconds, rate)
-        if value is not None:
-            total = (total or 0) + value
+    from ttd.services import summary as summary_svc
+
+    seconds, total = await summary_svc.unbilled_totals()
     money = format_money(total, "USD") if total is not None else "—"
     return seconds, money
 
@@ -123,12 +111,7 @@ async def delete_entry_by_id(entry_id) -> None:
 
 
 def hours_for_row(entry: Entry) -> str:
-    when = (
-        f"{entry.started_at:%-I:%M%p}–{entry.ended_at:%-I:%M%p}".lower()
-        if entry.started_at and entry.ended_at
-        else "—"
-    )
-    return when
+    return entry_time_label(entry)
 
 
 __all__ = [

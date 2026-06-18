@@ -126,3 +126,44 @@ def test_seed_demo_reset_wipes_existing_data(isolated_config):
     listing = runner.invoke(app, ["client", "list"]).output
     assert "Existing Client" not in listing
     assert "Acme Corp" in listing
+
+
+def test_project_rm_empty(isolated_config):
+    runner.invoke(app, ["client", "add", "Acme"])
+    runner.invoke(app, ["project", "add", "API", "--client", "acme"])
+    result = runner.invoke(app, ["project", "rm", "api", "--client", "acme"])
+    assert result.exit_code == 0, result.output
+    assert "Deleted project" in result.output
+    assert "api" not in runner.invoke(app, ["project", "list"]).output
+
+
+def test_project_rm_refuses_entries_without_force(isolated_config):
+    runner.invoke(app, ["client", "add", "Acme", "--rate", "150"])
+    runner.invoke(app, ["project", "add", "API", "--client", "acme"])
+    runner.invoke(app, ["log", "today 1h", "-p", "api"])
+    result = runner.invoke(app, ["project", "rm", "api", "--client", "acme"])
+    assert result.exit_code == 1
+    assert "entr" in result.output.lower()
+
+
+def test_project_rm_force_deletes_entries(isolated_config, monkeypatch):
+    runner.invoke(app, ["client", "add", "Acme", "--rate", "150"])
+    runner.invoke(app, ["project", "add", "API", "--client", "acme"])
+    runner.invoke(app, ["log", "today 1h", "-p", "api"])
+    monkeypatch.setattr("ttd.cli.projects.Confirm.ask", lambda _msg: True)
+    result = runner.invoke(app, ["project", "rm", "api", "--client", "acme", "--force"])
+    assert result.exit_code == 0, result.output
+    listing = runner.invoke(app, ["entry", "list"])
+    assert "No entries" in listing.output or listing.output.count("1:00") == 0
+
+
+def test_status_shows_week_and_unbilled(isolated_config):
+    runner.invoke(app, ["client", "add", "Acme", "--rate", "150"])
+    runner.invoke(app, ["project", "add", "API", "--client", "acme"])
+    runner.invoke(app, ["log", "today 2h", "-p", "api"])
+    result = runner.invoke(app, ["status"])
+    assert result.exit_code == 0, result.output
+    assert "This week:" in result.output
+    assert "Unbilled:" in result.output
+    assert "2:00" in result.output
+    assert "300" in result.output  # 2h * $150

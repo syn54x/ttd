@@ -12,8 +12,9 @@ from ttd.cli._pickers import project_choices, split_project_choice
 from ttd.cli._run import TtdApp, with_db
 from ttd.config.loader import get_settings
 from ttd.core.errors import TtdError
-from ttd.core.money import format_hours
+from ttd.core.money import format_hours, format_money
 from ttd.parsing.resolve import resolve_point
+from ttd.services import summary as summary_svc
 from ttd.services import timer as svc
 
 AtOpt = Annotated[str | None, Parameter(help="Clock time like '9am' or 'today 8:30'")]
@@ -87,8 +88,9 @@ def register(app: TtdApp) -> None:
     @app.command(name="status")
     @with_db
     async def status() -> None:
-        """Show the running timer and today's total."""
+        """Running timer, today's total, this week, and unbilled billable value."""
         now = datetime.now()
+        settings = get_settings()
         st = await svc.timer_status(now=now)
         if st.timer is None:
             console.print("[muted]No timer running.[/muted]")
@@ -100,6 +102,13 @@ def register(app: TtdApp) -> None:
                 + (f"  [muted]{st.timer.note}[/muted]" if st.timer.note else "")
             )
         console.print(f"Today: [bold]{format_hours(st.today_seconds)}[/bold]")
+        week_secs = await summary_svc.week_total(now.date(), settings.display.week_start)
+        unbilled_secs, unbilled_money = await summary_svc.unbilled_totals()
+        money = format_money(unbilled_money, "USD") if unbilled_money is not None else "—"
+        console.print(
+            f"This week: [bold]{format_hours(week_secs)}[/bold] · "
+            f"Unbilled: [bold]{format_hours(unbilled_secs)}[/bold] ({money})"
+        )
 
     @app.command(name="cancel")
     @with_db

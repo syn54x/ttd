@@ -14,7 +14,17 @@ from ttd.core.money import format_hours
 from ttd.core.rollup import EntryFacts, amount, rollup_days, seconds_by_date
 from ttd.core.taxes import compute_set_aside
 from ttd.reporting import periods
-from ttd.reporting.render import day_series, hours_cell, money_cell, sparkline
+from ttd.reporting.render import (
+    day_series,
+    entry_amount,
+    entry_detail_label,
+    entry_flags_markup,
+    group_entries_by_project,
+    hours_cell,
+    money_cell,
+    sparkline,
+    truncate_note,
+)
 from ttd.services import entries as entry_svc
 from ttd.services import projects as project_svc
 from ttd.storage.models import pk
@@ -24,6 +34,9 @@ app = TtdApp(name="report", help="Summaries by day, week, month, or range.")
 ProjectOpt = Annotated[str | None, Parameter(name=["--project", "-p"])]
 ClientOpt = Annotated[str | None, Parameter(name="--client")]
 ByOpt = Annotated[str, Parameter(name="--by", help="Group rows by: day|project|client")]
+EntriesOpt = Annotated[
+    bool, Parameter(name="--entries", help="Show individual entries under each project")
+]
 
 
 def _parse_date(raw: str, what: str) -> date:
@@ -58,15 +71,27 @@ async def _gather(period: periods.Period, project: str | None, client: str | Non
         if r.project.id not in rates:
             rates[r.project.id] = await project_svc.effective_rate(r.project)
             meta[r.project.id] = (r.project, r.client)
-    return facts, rates, meta
+    return rows, facts, rates, meta
 
 
-def _render(period: periods.Period, facts, rates, meta, by: str) -> None:
+def _render(
+    period: periods.Period,
+    rows: list[entry_svc.EntryRow],
+    facts,
+    rates,
+    meta,
+    by: str,
+    *,
+    entries: bool = False,
+) -> None:
     settings = get_settings()
     console.print(f"\n[bold]{period.label}[/bold]")
     if not facts:
         console.print("[muted]No entries in this period.[/muted]")
         return
+
+    if entries and by != "project":
+        raise TtdError("--entries requires --by project")
 
     cells = rollup_days(facts)
     days = period.days()
@@ -75,6 +100,7 @@ def _render(period: periods.Period, facts, rates, meta, by: str) -> None:
     total_tax = Decimal("0")
     set_aside_rate = settings.tax.set_aside_rate  # 0 hides the tax columns
     any_rate = False
+    entries_by_project = group_entries_by_project(rows) if entries else {}
 
     if by == "day":
         t = table("Date", "Project", "Entries", "Hours", "Amount")
@@ -139,6 +165,23 @@ def _render(period: periods.Period, facts, rates, meta, by: str) -> None:
                     money_cell(value - tax if has_rate else None, client.currency),
                 ]
             t.add_row(*row)
+            if entries and by == "project":
+                rate = rates[project.id]
+                currency = client.currency
+                for r in entries_by_project.get(pk(project), []):
+                    entry = r.entry
+                    entry_value = entry_amount(entry, rate, settings.billing)
+                    hours = format_hours(entry.seconds) + entry_flags_markup(entry)
+                    entry_row = [
+                        f"  [dim]{entry_detail_label(entry)}[/dim]",
+                        "",
+                        hours,
+                        truncate_note(entry.note),
+                        money_cell(entry_value, currency),
+                    ]
+                    if set_aside_rate > 0:
+                        entry_row += ["[muted]—[/muted]", "[muted]—[/muted]"]
+                    t.add_row(*entry_row)
         console.print(t)
 
     summary = f"Total: [bold]{format_hours(total_seconds)}[/bold]"
@@ -158,11 +201,18 @@ def key_of_fact(f: EntryFacts, by: str, meta: dict) -> str:
     return client.slug if by == "client" else f"{client.slug}/{project.slug}"
 
 
-async def _run(period: periods.Period, project: str | None, client: str | None, by: str) -> None:
+async def _run(
+    period: periods.Period,
+    project: str | None,
+    client: str | None,
+    by: str,
+    *,
+    entries: bool = False,
+) -> None:
     if by not in ("day", "project", "client"):
         raise TtdError(f"--by must be day, project, or client (got '{by}')")
-    facts, rates, meta = await _gather(period, project, client)
-    _render(period, facts, rates, meta, by)
+    rows, facts, rates, meta = await _gather(period, project, client)
+    _render(period, rows, facts, rates, meta, by, entries=entries)
 
 
 @app.command(name="day")
@@ -186,10 +236,11 @@ async def week(
     project: ProjectOpt = None,
     client: ClientOpt = None,
     by: ByOpt = "project",
+    entries: EntriesOpt = False,
 ) -> None:
     """This (or last) week."""
     period = periods.week_period(datetime.now().date(), get_settings().display.week_start, last)
-    await _run(period, project, client, by)
+    await _run(period, project, client, by, entries=entries)
 
 
 @app.command(name="month")
@@ -201,10 +252,11 @@ async def month(
     project: ProjectOpt = None,
     client: ClientOpt = None,
     by: ByOpt = "project",
+    entries: EntriesOpt = False,
 ) -> None:
     """A calendar month."""
     period = periods.month_period(datetime.now().date(), last=last, ym=ym)
-    await _run(period, project, client, by)
+    await _run(period, project, client, by, entries=entries)
 
 
 @app.command(name="range")
@@ -216,7 +268,8 @@ async def range_(
     project: ProjectOpt = None,
     client: ClientOpt = None,
     by: ByOpt = "project",
+    entries: EntriesOpt = False,
 ) -> None:
     """An arbitrary date range."""
     period = periods.range_period(_parse_date(date_from, "--from"), _parse_date(date_to, "--to"))
-    await _run(period, project, client, by)
+    await _run(period, project, client, by, entries=entries)

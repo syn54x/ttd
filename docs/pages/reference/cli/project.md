@@ -16,6 +16,7 @@ Manage projects.
 * [`archive`](#project-archive): Archive a project.
 * [`edit`](#project-edit): Edit a project.
 * [`list`](#project-list): List projects with effective rates and logged hours.
+* [`rm`](#project-rm): Delete a project. Refuses if it has entries unless --force.
 
 ## project add
 
@@ -74,3 +75,17 @@ Archive a project.
 
 * `SLUG, --slug`:   **\[required\]**
 * `--client`: Client slug
+
+## project rm
+
+```console
+ttd project rm [OPTIONS] SLUG
+```
+
+Delete a project. Refuses if it has entries unless --force.
+
+**Parameters**:
+
+* `SLUG, --slug`:   **\[required\]**
+* `--client`: Client slug
+* `--force, --no-force`: Also delete the project's entries  *\[default: False\]*

@@ -17,7 +17,7 @@ Create and manage invoices.
 * [`mark`](#invoice-mark): Update invoice status; void releases its entries for re-invoicing.
 * [`refresh`](#invoice-refresh): Recompute invoice lines from locked entries and show a before/after diff.
 * [`render`](#invoice-render): (Re)render an invoice's PDF/Markdown files.
-* [`show`](#invoice-show): Show one invoice with line items.
+* [`show`](#invoice-show): Show one invoice with line items, or rendered Markdown with --format md.
 
 ## invoice create
 
@@ -31,6 +31,7 @@ Invoice a client's uninvoiced billable work (defaults to last month).
 
 * `--client`: Client slug
 * `--month`: YYYY-MM
+* `--period`: Period spec: 'last month', 'this month', YYYY-MM, or YYYY-MM-DD to YYYY-MM-DD
 * `--from`:
 * `--to`:
 * `--number`: Override the number
@@ -51,14 +52,15 @@ List invoices, newest first.
 ## invoice show
 
 ```console
-ttd invoice show NUMBER
+ttd invoice show [OPTIONS] NUMBER
 ```
 
-Show one invoice with line items.
+Show one invoice with line items, or rendered Markdown with --format md.
 
 **Parameters**:
 
 * `NUMBER, --number`:   **\[required\]**
+* `--format`: Output format: table (default) or md  *\[default: table\]*
 
 ## invoice render
 
