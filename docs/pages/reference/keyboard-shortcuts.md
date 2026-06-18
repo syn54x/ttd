@@ -17,6 +17,7 @@ Available on every screen:
 | `6` | Taxes |
 | `s` | Start / stop the timer |
 | `l` | Quick log |
+| `t` | Theme picker |
 | `r` | Refresh |
 | `q` | Quit |
 
@@ -54,6 +55,7 @@ Available on every screen:
 | --- | --- |
 | `n` | New invoice |
 | `o` | Open detail |
+| `u` | Refresh (recompute from locked entries) |
 | `m` | Preview Markdown |
 | `e` | Render PDF + Markdown |
 | `t` | Mark sent |
@@ -74,4 +76,4 @@ Available on every screen:
 | `enter` | Submit (quick log, forms, pickers) |
 | `escape` | Cancel / close |
 | `y` | Confirm, in confirmation dialogs |
-| `ctrl+s` | Create, in the new-invoice form |
+| `ctrl+s` | Create, in the new-invoice form; apply refresh, in the refresh diff modal |

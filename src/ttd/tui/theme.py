@@ -5,6 +5,9 @@ Near-black paper, one saturated amber accent, thin rules instead of boxes.
 
 from textual.theme import Theme
 
+THEME_DARK = "ttd-dark"
+THEME_LIGHT = "ttd-light"
+
 AMBER = "#ffb000"
 INK = "#0d0f12"
 

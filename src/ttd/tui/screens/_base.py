@@ -47,6 +47,7 @@ class TtdScreen(Screen):
         Binding("6", "goto('taxes')", "taxes", group=SCREEN_GROUP),
         Binding("s", "toggle_timer", "start/stop"),
         Binding("l", "quick_log", "log"),
+        Binding("t", "pick_theme", "theme"),
         Binding("r", "refresh", "refresh"),
         Binding("q", "quit_app", "quit"),
     ]
@@ -128,6 +129,11 @@ class TtdScreen(Screen):
             await self.refresh_data()
 
         self.app.push_screen(PickerModal("start timer on…", options), _start)
+
+    def action_pick_theme(self) -> None:
+        search = getattr(self.app, "search_themes", None)
+        if search is not None:
+            search()
 
     async def action_quick_log(self) -> None:
         options = await project_options()

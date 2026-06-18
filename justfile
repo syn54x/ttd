@@ -11,6 +11,15 @@ check:
     uv run ruff format --check .
     uv run ty check src
 
+# Copy the active ledger to ~/Backups/ttd/ (timestamped). Run before feature work.
+backup:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    dest="${HOME}/Backups/ttd"
+    mkdir -p "$dest"
+    uv run ttd db path
+    uv run ttd db backup "$dest"
+
 # Install Python deps (uv) and git hooks (prek via uv).
 setup:
     uv sync

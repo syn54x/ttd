@@ -88,6 +88,43 @@ Tree {
     margin-bottom: 1;
 }
 
+/* ---- theme picker ---- */
+
+.modal-box.theme-picker {
+    width: 110;
+    max-width: 95%;
+}
+
+.theme-picker-body {
+    height: 22;
+    margin-bottom: 1;
+}
+
+.theme-picker-list {
+    width: 40%;
+    padding-right: 1;
+}
+
+.theme-picker-list OptionList {
+    height: 1fr;
+    max-height: 100%;
+    margin-bottom: 0;
+    background: $surface;
+}
+
+.theme-picker-list .option-list--option-disabled {
+    color: $accent;
+    text-style: bold;
+}
+
+.theme-picker-list Input {
+    margin-bottom: 1;
+}
+
+#theme-preview {
+    width: 1fr;
+}
+
 /* ---- modals ---- */
 
 ModalScreen {

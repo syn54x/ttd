@@ -56,7 +56,7 @@ Screen `5`. Every invoice with its status pill; create, inspect, render, and
 advance them without leaving the screen. When `tax.set_aside_rate` is set, the
 list adds **est. tax** and **take-home** columns (dim until the invoice is
 paid), and the detail modal shows the same figures. Keys: `n` new, `o` detail,
-`m` markdown preview, `e` render files, `t` sent, `p` paid, `v` void.
+`u` refresh, `m` markdown preview, `e` render files, `t` sent, `p` paid, `v` void.
 
 ![Invoices](../assets/screenshots/invoices-list.svg)
 
@@ -80,7 +80,15 @@ accept `y`; pickers are arrow-key lists.
 
 ## Themes
 
-Two built-in themes, switched via config:
+Press `t` anywhere in the TUI, or open the command palette (`ctrl+p`) →
+**Theme**, to browse Textual's full theme catalog in a two-column picker:
+searchable list on the left, a miniature TUI preview on the right. Arrow keys
+update the preview live; press ++enter++ to apply or ++escape++ to cancel and
+restore your previous theme. You'll be asked whether to save the choice as
+your default.
+
+Saved themes go to your global config file. You can also set the theme via
+config (takes effect on next launch):
 
 ```console
 $ ttd config set display.theme ttd-light    # or ttd-dark (default)

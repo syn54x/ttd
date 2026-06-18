@@ -85,7 +85,7 @@ class DisplayConfig(_Section):
     week_start: Literal["monday", "sunday"] = "monday"
     """First day of the week in reports."""
     theme: str = "ttd-dark"
-    """TUI theme name."""
+    """TUI theme name (any Textual theme, e.g. ttd-dark, dracula, nord)."""
 
 
 class ParsingConfig(_Section):

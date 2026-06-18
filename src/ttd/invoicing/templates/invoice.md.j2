@@ -17,10 +17,11 @@
 
 ## Work
 
-| Date | Description | Hours | Rate | Amount |
-|---|---|--:|--:|--:|
 {% for line in lines -%}
-| {{ line.work_date.strftime("%b %-d") }} | {{ line.description }} | {{ "%.2f" | format(line.billed_seconds / 3600) }} | {{ money(line.rate) }} | {{ money(line.amount) }} |
+**{{ line.work_date.strftime("%b %-d") }}** · {{ "%.2f" | format(line.billed_seconds / 3600) }} h · {{ money(line.rate) }} · **{{ money(line.amount) }}**
+
+{{ line.description }}
+
 {% endfor %}
 
 | | |

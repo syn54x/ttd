@@ -197,6 +197,119 @@ class NewInvoiceModal(ModalScreen["svc.Draft | None"]):
             self.dismiss(self.draft)
 
 
+def _format_diff_cell(
+    field: str, diff: svc.LineDiff, currency: str, *, changed_only: bool = False
+) -> str:
+    if changed_only and field not in diff.changed:
+        return ""
+    before = diff.before
+    after = diff.after
+    if field == "description":
+        old = svc.flatten_line_description(before.description if before else "")
+        new = svc.flatten_line_description(after.description)
+        if old == new:
+            return new
+        return f"[dim]{old}[/dim] → {new}"
+    if field == "billed_seconds":
+        old = format_hours(before.billed_seconds) if before else "0:00"
+        new = format_hours(after.billed_seconds)
+        if old == new:
+            return new
+        return f"[dim]{old}[/dim] → {new}"
+    if field == "rate":
+        old = format_money(before.rate, currency) if before else "—"
+        new = format_money(after.rate, currency)
+        if old == new:
+            return new
+        return f"[dim]{old}[/dim] → {new}"
+    if field == "amount":
+        old = format_money(before.amount, currency) if before else "—"
+        new = format_money(after.amount, currency)
+        if old == new:
+            return new
+        return f"[dim]{old}[/dim] → {new}"
+    return ""
+
+
+class InvoiceRefreshModal(ModalScreen["svc.RefreshPreview | None"]):
+    """Before/after diff for recomputing invoice lines from locked entries."""
+
+    BINDINGS: ClassVar = [
+        ("escape", "dismiss(None)", "cancel"),
+        ("ctrl+s", "apply", "apply"),
+    ]
+
+    def __init__(self, preview: svc.RefreshPreview) -> None:
+        super().__init__()
+        self.preview = preview
+
+    def compose(self) -> ComposeResult:
+        invoice = self.preview.invoice
+        status = enum_value(invoice.status)
+        currency = invoice.currency
+        with Vertical(classes="modal-box wide"):
+            yield Label(
+                f"refresh · {invoice.number} · [{PILL.get(status, 'dim')}]{status}[/]",
+                classes="modal-title",
+            )
+            if self.preview.blocked_reason:
+                yield Static(f"[#ff5c5c]{self.preview.blocked_reason}[/#ff5c5c]")
+            elif status == "paid" and self.preview.can_apply:
+                yield Static("[dim]Paid invoice — only line descriptions will be updated.[/dim]")
+            elif not self.preview.has_changes:
+                yield Static("[dim]No changes — invoice lines match current rules.[/dim]")
+
+            table = DataTable(id="refresh-table", cursor_type="none")
+            table.add_columns("date", "project", "description", "hours", "rate", "amount")
+            for diff in self.preview.lines:
+                if not diff.changed:
+                    continue
+                table.add_row(
+                    diff.work_date.strftime("%a %b %-d"),
+                    diff.project_name,
+                    _format_diff_cell("description", diff, currency),
+                    _format_diff_cell("billed_seconds", diff, currency),
+                    _format_diff_cell("rate", diff, currency),
+                    _format_diff_cell("amount", diff, currency),
+                )
+            yield table
+
+            totals = self.preview
+            sub = format_money(totals.before_subtotal, currency)
+            sub_after = format_money(totals.after_subtotal, currency)
+            total = format_money(totals.before_total, currency)
+            total_after = format_money(totals.after_total, currency)
+            if totals.totals_changed:
+                footer = (
+                    f"subtotal {sub} → [bold]{sub_after}[/bold] · "
+                    f"total {total} → [bold]{total_after}[/bold]"
+                )
+            else:
+                footer = f"subtotal {sub} · total {total}"
+            yield Label(footer)
+
+            with Horizontal(classes="modal-buttons"):
+                yield Button(
+                    "Apply (ctrl+s)",
+                    variant="primary",
+                    id="apply",
+                    disabled=not self.preview.can_apply,
+                )
+                yield Button("Cancel (esc)", id="cancel")
+
+    @on(Button.Pressed, "#apply")
+    def _apply_pressed(self) -> None:
+        self.action_apply()
+
+    @on(Button.Pressed, "#cancel")
+    def _cancel_pressed(self) -> None:
+        self.dismiss(None)
+
+    def action_apply(self) -> None:
+        if self.preview.can_apply:
+            self.dismiss(self.preview)
+
+
 class InvoicesScreen(TtdScreen):
     nav_id = "invoices"
 
@@ -206,6 +319,7 @@ class InvoicesScreen(TtdScreen):
         Binding("o", "open_detail", "open"),
         ("m", "preview_markdown", "preview md"),
         ("e", "render_files", "render pdf+md"),
+        ("u", "refresh_invoice", "update"),
         ("p", "mark('paid')", "paid"),
         ("t", "mark('sent')", "sent"),
         ("v", "mark('void')", "void"),
@@ -248,7 +362,8 @@ class InvoicesScreen(TtdScreen):
             table.add_row(*row, key=invoice.number)
         self.query_one("#invoice-help", Label).update(
             f"{len(rows)} invoice{'s' if len(rows) != 1 else ''}   "
-            "[dim]n new · o detail · m preview md · e render · t sent · p paid · v void[/dim]"
+            "[dim]n new · o detail · u update · m preview md · e render · "
+            "t sent · p paid · v void[/dim]"
         )
 
     def _selected_number(self) -> str | None:
@@ -282,6 +397,28 @@ class InvoicesScreen(TtdScreen):
         render_pdf(view, settings, stem.with_suffix(".pdf"))
         write_markdown(view, settings, stem.with_suffix(".md"))
         self.notify(f"wrote {stem}.pdf + .md", title="rendered")
+
+    async def action_refresh_invoice(self) -> None:
+        number = self._selected_number()
+        if number is None:
+            return
+        try:
+            preview = await svc.preview_refresh(number, get_settings())
+        except TtdError as exc:
+            self.notify(str(exc), severity="error")
+            return
+
+        async def _done(accepted: svc.RefreshPreview | None) -> None:
+            if accepted is None or not accepted.can_apply:
+                return
+            try:
+                await svc.apply_refresh(number, accepted, get_settings())
+                self.notify(f"updated {number}", title="refresh")
+            except TtdError as exc:
+                self.notify(str(exc), severity="error")
+            await self.refresh_data()
+
+        self.app.push_screen(InvoiceRefreshModal(preview), _done)
 
     async def action_mark(self, status: str) -> None:
         number = self._selected_number()

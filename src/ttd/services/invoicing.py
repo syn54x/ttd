@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from ferro import transaction
 
@@ -26,6 +26,36 @@ from ttd.storage.models import (
     enum_value,
     pk,
 )
+
+PAID_REFRESH_BLOCKED = (
+    "Paid invoices can only be updated for description changes. "
+    "Totals or line amounts would change — void and re-invoice to change billing."
+)
+
+BILLING_FIELDS = frozenset({"billed_seconds", "rate", "amount"})
+
+
+def _line_description(project_name: str, entry_count: int, notes: list[str]) -> str:
+    base = f"{project_name} — {entry_count} entr{'y' if entry_count == 1 else 'ies'}"
+    if not notes:
+        return base
+    bullets = "\n".join(f"- {note}" for note in notes)
+    return f"{base}\n{bullets}"
+
+
+def flatten_line_description(text: str) -> str:
+    """Single-line form for tables and terminals."""
+    if not text:
+        return ""
+    lines = text.splitlines()
+    if len(lines) == 1:
+        return lines[0]
+    return f"{lines[0]} · {' · '.join(lines[1:])}"
+
+
+def _entry_sort_key(entry: Entry) -> tuple:
+    started = entry.started_at or datetime.combine(entry.work_date, datetime.min.time())
+    return (entry.work_date, started, entry.created_at)
 
 
 @dataclass
@@ -59,30 +89,73 @@ class InvoiceView:
     project_names: dict
 
 
-async def build_draft(client_slug: str, period: Period, settings: Settings) -> Draft:
-    client = await get_client(client_slug)
-    projects = {pk(p): p for p in await Project.where(lambda p: p.client_id == client.id).all()}
-    if not projects:
-        raise TtdError(f"Client '{client_slug}' has no projects")
+@dataclass
+class LineDiff:
+    project_id: UUID
+    work_date: date
+    project_name: str
+    before: InvoiceLine | None
+    after: DraftLine
+    changed: frozenset[str]
 
-    entries = [
-        e
-        for e in await Entry.all()
-        if e.project_id in projects
-        and e.invoice_id is None
-        and e.billable
-        and period.start <= e.work_date <= period.end
-    ]
-    if not entries:
-        raise TtdError(f"No uninvoiced billable entries for '{client_slug}' in {period.label}")
 
+@dataclass
+class RefreshPreview:
+    invoice: Invoice
+    client: Client
+    lines: list[LineDiff]
+    before_subtotal: Decimal
+    after_subtotal: Decimal
+    before_tax: Decimal
+    after_tax: Decimal
+    before_total: Decimal
+    after_total: Decimal
+    totals_changed: bool
+    billing_fields_changed: bool
+    has_changes: bool
+    can_apply: bool
+    blocked_reason: str | None
+
+
+def _line_key(project_id: UUID, work_date: date) -> tuple[UUID, date]:
+    return (project_id, work_date)
+
+
+def _draft_totals(lines: list[DraftLine], tax_rate: Decimal) -> tuple[Decimal, Decimal, Decimal]:
+    subtotal = sum((line.amount for line in lines), Decimal("0"))
+    tax = to_cents(subtotal * tax_rate)
+    return subtotal, tax, subtotal + tax
+
+
+def _line_changed(before: InvoiceLine | None, after: DraftLine) -> frozenset[str]:
+    if before is None:
+        return frozenset({"description", "billed_seconds", "rate", "amount"})
+    changed: set[str] = set()
+    if before.description != after.description:
+        changed.add("description")
+    if before.billed_seconds != after.billed_seconds:
+        changed.add("billed_seconds")
+    if before.rate != after.rate:
+        changed.add("rate")
+    if before.amount != after.amount:
+        changed.add("amount")
+    return frozenset(changed)
+
+
+async def _build_lines_from_entries(
+    entries: list[Entry],
+    client: Client,
+    projects: dict[UUID, Project],
+    settings: Settings,
+) -> list[DraftLine]:
+    entries = sorted(entries, key=_entry_sort_key)
     facts = [
-        EntryFacts(e.project_id, pk(client), e.work_date, e.seconds, e.billable) for e in entries
+        EntryFacts(e.project_id, pk(client), e.work_date, e.seconds, e.billable, e.note)
+        for e in entries
     ]
     cells = rollup_days(facts)
 
     lines: list[DraftLine] = []
-    subtotal = Decimal("0")
     for cell in cells:
         project = projects[cell.project_id]
         rate = await effective_rate(project)
@@ -110,21 +183,39 @@ async def build_draft(client_slug: str, period: Period, settings: Settings) -> D
                 billed_seconds=billed,
                 rate=rate,
                 amount=amount,
-                description=f"{project.name} — {cell.entry_count} "
-                f"entr{'y' if cell.entry_count == 1 else 'ies'}",
+                description=_line_description(project.name, cell.entry_count, cell.notes),
                 entry_ids=entry_ids,
             )
         )
-        subtotal += amount
+    return lines
 
-    tax = to_cents(subtotal * settings.invoice.tax_rate)
+
+async def build_draft(client_slug: str, period: Period, settings: Settings) -> Draft:
+    client = await get_client(client_slug)
+    projects = {pk(p): p for p in await Project.where(lambda p: p.client_id == client.id).all()}
+    if not projects:
+        raise TtdError(f"Client '{client_slug}' has no projects")
+
+    entries = [
+        e
+        for e in await Entry.all()
+        if e.project_id in projects
+        and e.invoice_id is None
+        and e.billable
+        and period.start <= e.work_date <= period.end
+    ]
+    if not entries:
+        raise TtdError(f"No uninvoiced billable entries for '{client_slug}' in {period.label}")
+
+    lines = await _build_lines_from_entries(entries, client, projects, settings)
+    subtotal, tax, total = _draft_totals(lines, settings.invoice.tax_rate)
     return Draft(
         client=client,
         period=period,
         lines=lines,
         subtotal=subtotal,
         tax=tax,
-        total=subtotal + tax,
+        total=total,
     )
 
 
@@ -243,3 +334,184 @@ def _clear_paid_snapshot(invoice: Invoice) -> None:
     invoice.paid_date = None
     invoice.set_aside_rate = None
     invoice.set_aside = None
+
+
+async def preview_refresh(number: str, settings: Settings) -> RefreshPreview:
+    view = await get_invoice(number)
+    invoice, client = view.invoice, view.client
+    status = enum_value(invoice.status)
+    if status == "void":
+        raise ConflictError(f"Invoice {number} is void and can't be refreshed")
+
+    entries = await Entry.where(lambda e: e.invoice_id == invoice.id).all()
+    if not entries:
+        raise TtdError(f"Invoice {number} has no linked entries")
+
+    project_ids = {e.project_id for e in entries}
+    projects = {pk(p): p for p in await Project.all() if pk(p) in project_ids}
+    after_lines = await _build_lines_from_entries(entries, client, projects, settings)
+
+    before_by_key = {_line_key(li.project_id, li.work_date): li for li in view.lines}
+    after_by_key = {_line_key(pk(line.project), line.work_date): line for line in after_lines}
+
+    all_keys = sorted(set(before_by_key) | set(after_by_key), key=lambda k: (k[1], str(k[0])))
+
+    diffs: list[LineDiff] = []
+    billing_fields_changed = False
+    for key in all_keys:
+        project_id, work_date = key
+        before = before_by_key.get(key)
+        after = after_by_key.get(key)
+        project_name = view.project_names.get(project_id, projects[project_id].name)
+
+        if after is None:
+            assert before is not None
+            billing_fields_changed = True
+            diffs.append(
+                LineDiff(
+                    project_id=project_id,
+                    work_date=work_date,
+                    project_name=project_name,
+                    before=before,
+                    after=DraftLine(
+                        project=projects[project_id],
+                        work_date=work_date,
+                        raw_seconds=before.billed_seconds,
+                        billed_seconds=0,
+                        rate=before.rate,
+                        amount=Decimal("0"),
+                        description="",
+                        entry_ids=[],
+                    ),
+                    changed=frozenset({"description", "billed_seconds", "rate", "amount"}),
+                )
+            )
+            continue
+
+        changed = _line_changed(before, after)
+        if changed & BILLING_FIELDS:
+            billing_fields_changed = True
+        diffs.append(
+            LineDiff(
+                project_id=project_id,
+                work_date=work_date,
+                project_name=project_name,
+                before=before,
+                after=after,
+                changed=changed,
+            )
+        )
+
+    before_subtotal = invoice.subtotal
+    before_tax = invoice.tax
+    before_total = invoice.total
+    after_subtotal, after_tax, after_total = _draft_totals(after_lines, settings.invoice.tax_rate)
+
+    totals_changed = (
+        before_subtotal != after_subtotal or before_tax != after_tax or before_total != after_total
+    )
+    has_changes = any(d.changed for d in diffs) or totals_changed
+
+    description_only = has_changes and not totals_changed and not billing_fields_changed
+    can_apply = has_changes and (
+        status in ("draft", "sent") or (status == "paid" and description_only)
+    )
+    blocked_reason: str | None = None
+    if status == "paid" and has_changes and not description_only:
+        blocked_reason = PAID_REFRESH_BLOCKED
+
+    return RefreshPreview(
+        invoice=invoice,
+        client=client,
+        lines=diffs,
+        before_subtotal=before_subtotal,
+        after_subtotal=after_subtotal,
+        before_tax=before_tax,
+        after_tax=after_tax,
+        before_total=before_total,
+        after_total=after_total,
+        totals_changed=totals_changed,
+        billing_fields_changed=billing_fields_changed,
+        has_changes=has_changes,
+        can_apply=can_apply,
+        blocked_reason=blocked_reason,
+    )
+
+
+async def apply_refresh(number: str, preview: RefreshPreview, settings: Settings) -> Invoice:
+    status = enum_value(preview.invoice.status)
+    if status == "void":
+        raise ConflictError(f"Invoice {number} is void and can't be refreshed")
+    if not preview.can_apply:
+        if preview.blocked_reason:
+            raise TtdError(preview.blocked_reason)
+        raise TtdError("No changes to apply")
+
+    fresh = await preview_refresh(number, settings)
+    if not fresh.can_apply:
+        if fresh.blocked_reason:
+            raise TtdError(fresh.blocked_reason)
+        raise TtdError("Invoice changed since preview — refresh again")
+
+    invoice = fresh.invoice
+    status = enum_value(invoice.status)
+
+    async with transaction():
+        if status == "paid":
+            before_by_key = {
+                _line_key(li.project_id, li.work_date): li
+                for li in await InvoiceLine.where(lambda li: li.invoice_id == invoice.id).all()
+            }
+            for diff in fresh.lines:
+                if "description" not in diff.changed:
+                    continue
+                stored = before_by_key.get(_line_key(diff.project_id, diff.work_date))
+                if stored is None:
+                    continue
+                stored.description = diff.after.description
+                await stored.save()
+        else:
+            stored_lines = await InvoiceLine.where(lambda li: li.invoice_id == invoice.id).all()
+            stored_by_key = {_line_key(li.project_id, li.work_date): li for li in stored_lines}
+            seen_keys: set[tuple[UUID, date]] = set()
+
+            for diff in fresh.lines:
+                key = _line_key(diff.project_id, diff.work_date)
+                after = diff.after
+                if after.billed_seconds == 0 and diff.before is not None:
+                    continue
+                seen_keys.add(key)
+                if not diff.changed:
+                    continue
+                if key in stored_by_key:
+                    line = stored_by_key[key]
+                    line.description = after.description
+                    line.billed_seconds = after.billed_seconds
+                    line.rate = after.rate
+                    line.amount = after.amount
+                    await line.save()
+                else:
+                    await InvoiceLine(
+                        id=uuid4(),
+                        invoice_id=pk(invoice),
+                        project_id=diff.project_id,
+                        work_date=diff.work_date,
+                        billed_seconds=after.billed_seconds,
+                        rate=after.rate,
+                        amount=after.amount,
+                        description=after.description,
+                    ).save()
+
+            for key, line in stored_by_key.items():
+                if key not in seen_keys:
+                    await line.delete()
+
+            invoice.subtotal = fresh.after_subtotal
+            invoice.tax_rate = settings.invoice.tax_rate
+            invoice.tax = fresh.after_tax
+            invoice.total = fresh.after_total
+            await invoice.save()
+
+    updated = await Invoice.where(lambda i: i.number == number).first()
+    assert updated is not None
+    return updated

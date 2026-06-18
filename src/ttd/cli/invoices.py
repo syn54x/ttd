@@ -262,6 +262,88 @@ async def render(
     _render_files(view, pdf, md, out)
 
 
+def _print_refresh_diff(preview: svc.RefreshPreview) -> None:
+    invoice = preview.invoice
+    currency = invoice.currency
+    status = enum_value(invoice.status)
+    console.print(f"\n[bold]Refresh {invoice.number}[/bold]  {_status_pill(status)}")
+    if preview.blocked_reason:
+        console.print(f"[err]{preview.blocked_reason}[/err]")
+    elif status == "paid" and preview.can_apply:
+        console.print("[muted]Paid invoice — only line descriptions will be updated.[/muted]")
+    elif not preview.has_changes:
+        console.print("[muted]No changes — invoice lines match current rules.[/muted]")
+
+    changed = [d for d in preview.lines if d.changed]
+    if changed:
+        t = table("Date", "Project", "Description", "Hours", "Rate", "Amount")
+        for diff in changed:
+            t.add_row(
+                diff.work_date.strftime("%a %b %-d"),
+                diff.project_name,
+                _refresh_diff_cell("description", diff, currency),
+                _refresh_diff_cell("billed_seconds", diff, currency),
+                _refresh_diff_cell("rate", diff, currency),
+                _refresh_diff_cell("amount", diff, currency),
+            )
+        console.print(t)
+
+    sub = format_money(preview.before_subtotal, currency)
+    sub_after = format_money(preview.after_subtotal, currency)
+    total = format_money(preview.before_total, currency)
+    total_after = format_money(preview.after_total, currency)
+    if preview.totals_changed:
+        console.print(f"Subtotal: {sub} → [bold]{sub_after}[/bold]")
+        if preview.before_tax or preview.after_tax:
+            console.print(
+                f"Tax: {format_money(preview.before_tax, currency)} → "
+                f"[bold]{format_money(preview.after_tax, currency)}[/bold]"
+            )
+        console.print(f"Total: {total} → [bold]{total_after}[/bold]")
+    else:
+        console.print(f"Subtotal: {sub} · Total: {total}")
+
+
+def _refresh_diff_cell(field: str, diff: svc.LineDiff, currency: str) -> str:
+    before = diff.before
+    after = diff.after
+    if field == "description":
+        old = svc.flatten_line_description(before.description if before else "")
+        new = svc.flatten_line_description(after.description)
+    elif field == "billed_seconds":
+        old, new = (
+            f"{before.billed_seconds / 3600:.2f}" if before else "0.00",
+            f"{after.billed_seconds / 3600:.2f}",
+        )
+    elif field == "rate":
+        old = format_money(before.rate, currency) if before else "—"
+        new = format_money(after.rate, currency)
+    else:
+        old = format_money(before.amount, currency) if before else "—"
+        new = format_money(after.amount, currency)
+    if field not in diff.changed or old == new:
+        return new
+    return f"[muted]{old}[/muted] → {new}"
+
+
+@app.command(name="refresh")
+@with_db
+async def refresh(
+    number: str,
+    *,
+    apply: Annotated[bool, Parameter(name="--apply", help="Apply changes when allowed")] = False,
+) -> None:
+    """Recompute invoice lines from locked entries and show a before/after diff."""
+    settings = get_settings()
+    preview = await svc.preview_refresh(number, settings)
+    _print_refresh_diff(preview)
+    if apply:
+        if not preview.can_apply:
+            raise TtdError(preview.blocked_reason or "No changes to apply")
+        invoice = await svc.apply_refresh(number, preview, settings)
+        success(f"Updated invoice [accent]{invoice.number}[/accent]")
+
+
 @app.command(name="mark")
 @with_db
 async def mark(
