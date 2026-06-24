@@ -4,9 +4,11 @@ from datetime import date, time
 
 from ttd.interchange.model import EntryRecord
 from ttd.services.entries import list_entries
+from ttd.storage.db import in_db_session
 from ttd.storage.models import Client, Invoice, Project
 
 
+@in_db_session
 async def export_records(
     *,
     project_slug: str | None = None,

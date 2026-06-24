@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from ttd.config.schema import Settings, StorageConfig
-from ttd.storage.db import close_db, init_db
+from ttd.storage.db import close_db, db_lifespan
 
 
 @pytest.fixture
@@ -28,6 +28,6 @@ def isolated_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator
 @pytest.fixture
 async def db(settings: Settings) -> AsyncIterator[Settings]:
     await close_db()
-    await init_db(settings)
-    yield settings
+    async with db_lifespan(settings):
+        yield settings
     await close_db()

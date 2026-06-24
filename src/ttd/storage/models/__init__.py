@@ -34,4 +34,5 @@ __all__ = [
     "TaxPayment",
     "TimerState",
     "enum_value",
+    "pk",
 ]
