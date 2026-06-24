@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from _db import open_test_db
 
 from ttd.config.schema import Settings, StorageConfig
 from ttd.services import clients as client_svc
@@ -11,7 +12,6 @@ from ttd.services import entries as entry_svc
 from ttd.services import invoicing as invoice_svc
 from ttd.services import projects as project_svc
 from ttd.services import timer as timer_svc
-from ttd.storage.db import close_db, init_db
 from ttd.tui.app import TtdApp
 from ttd.tui.theme import THEME_DARK, THEME_LIGHT
 from ttd.tui.widgets.modals import ConfirmModal
@@ -27,20 +27,17 @@ async def seeded_app(tmp_path, monkeypatch):
     monkeypatch.setenv("TTD_CONFIG_DIR", str(tmp_path / "config"))
     settings = Settings(storage=StorageConfig(db_path=db_path))
 
-    await close_db()
-    await init_db(settings)
-    await client_svc.create_client("Acme Corp", hourly_rate=Decimal("150"))
-    await client_svc.create_client("Beta LLC", hourly_rate=Decimal("95"))
-    await project_svc.create_project("API Rewrite", "acme-corp")
-    await project_svc.create_project("Design", "beta-llc")
-    for days_back in range(0, 14, 2):
-        day = (NOW - timedelta(days=days_back)).date().isoformat()
-        await entry_svc.log_entry(f"{day} 09:00 to 11:30", "api-rewrite", now=NOW)
-    await entry_svc.log_entry("today 1pm to 2pm", "design", now=NOW, note="reviews")
-    await close_db()
+    async with open_test_db(settings):
+        await client_svc.create_client("Acme Corp", hourly_rate=Decimal("150"))
+        await client_svc.create_client("Beta LLC", hourly_rate=Decimal("95"))
+        await project_svc.create_project("API Rewrite", "acme-corp")
+        await project_svc.create_project("Design", "beta-llc")
+        for days_back in range(0, 14, 2):
+            day = (NOW - timedelta(days=days_back)).date().isoformat()
+            await entry_svc.log_entry(f"{day} 09:00 to 11:30", "api-rewrite", now=NOW)
+        await entry_svc.log_entry("today 1pm to 2pm", "design", now=NOW, note="reviews")
 
     yield TtdApp()
-    await close_db()
 
 
 async def test_dashboard_loads_with_entries(seeded_app):
@@ -244,12 +241,11 @@ async def test_invoice_detail_modal(seeded_app, monkeypatch):
     from ttd.config.schema import Settings as S
     from ttd.reporting.periods import range_period
 
-    await init_db()
-    period = range_period(date.today() - td(days=30), date.today())
-    settings = S(business={"default_hourly_rate": 100})
-    draft = await invoice_svc.build_draft("acme-corp", period, settings)
-    await invoice_svc.persist_draft(draft, settings)
-    await close_db()
+    async with open_test_db():
+        period = range_period(date.today() - td(days=30), date.today())
+        settings = S(business={"default_hourly_rate": 100})
+        draft = await invoice_svc.build_draft("acme-corp", period, settings)
+        await invoice_svc.persist_draft(draft, settings)
 
     async with seeded_app.run_test(size=(120, 40)) as pilot:
         await pilot.press("5")
@@ -273,12 +269,11 @@ async def test_invoices_screen_tax_columns(seeded_app, monkeypatch):
     from ttd.config.schema import Settings as S
     from ttd.reporting.periods import range_period
 
-    await init_db()
-    period = range_period(date.today() - td(days=30), date.today())
-    settings = S(business={"default_hourly_rate": 100})
-    draft = await invoice_svc.build_draft("acme-corp", period, settings)
-    await invoice_svc.persist_draft(draft, settings)
-    await close_db()
+    async with open_test_db():
+        period = range_period(date.today() - td(days=30), date.today())
+        settings = S(business={"default_hourly_rate": 100})
+        draft = await invoice_svc.build_draft("acme-corp", period, settings)
+        await invoice_svc.persist_draft(draft, settings)
 
     monkeypatch.setenv("TTD_TAX__SET_ASIDE_RATE", "0.32")
     async with seeded_app.run_test(size=(140, 40)) as pilot:
@@ -386,12 +381,11 @@ async def test_entry_edit_modal(seeded_app):
 async def test_entry_edit_invoiced_blocked(seeded_app):
     from uuid import uuid4
 
-    await init_db()
-    rows = await entry_svc.list_entries()
-    target = next(r for r in rows if r.entry.work_date == NOW.date())
-    target.entry.invoice_id = uuid4()
-    await target.entry.save()
-    await close_db()
+    async with open_test_db():
+        rows = await entry_svc.list_entries()
+        target = next(r for r in rows if r.entry.work_date == NOW.date())
+        target.entry.invoice_id = uuid4()
+        await target.entry.save()
 
     from ttd.tui.widgets.forms import FormModal
 
@@ -430,7 +424,7 @@ async def test_clients_crud_flow(seeded_app):
 
         # archive it (cursor needs to be on the node)
         gamma = next(n for n in tree.root.children if "Gamma" in str(n.label))
-        tree.cursor_line = gamma.line
+        tree.select_node(gamma)
         await pilot.pause()
         await pilot.press("x")
         await pilot.pause()
@@ -513,13 +507,12 @@ async def test_invoice_wizard_custom_period_with_line_preview(seeded_app):
         table = seeded_app.screen.query_one("#invoice-table")
         assert table.row_count == 1
 
-    await init_db()
-    from ttd.services import invoicing as invoice_svc
+    async with open_test_db():
+        from ttd.services import invoicing as invoice_svc
 
-    ((invoice, _client),) = await invoice_svc.list_invoices()
-    assert invoice.period_start.isoformat() == start
-    assert invoice.period_end.isoformat() == end
-    await close_db()
+        ((invoice, _client),) = await invoice_svc.list_invoices()
+        assert invoice.period_start.isoformat() == start
+        assert invoice.period_end.isoformat() == end
 
 
 async def test_invoice_wizard_empty_period_shows_friendly_message(seeded_app):
@@ -560,11 +553,10 @@ async def test_invoice_markdown_preview(seeded_app):
     from ttd.services import invoicing as invoice_svc
     from ttd.tui.screens.invoices import MarkdownPreviewModal
 
-    await init_db()
-    period = range_period(date.today() - td(days=30), date.today())
-    draft = await invoice_svc.build_draft("acme-corp", period, S())
-    invoice = await invoice_svc.persist_draft(draft, S())
-    await close_db()
+    async with open_test_db():
+        period = range_period(date.today() - td(days=30), date.today())
+        draft = await invoice_svc.build_draft("acme-corp", period, S())
+        invoice = await invoice_svc.persist_draft(draft, S())
 
     async with seeded_app.run_test(size=(120, 40)) as pilot:
         await pilot.press("5")
@@ -589,12 +581,11 @@ async def test_taxes_screen_shows_quarters_and_payment_modal(seeded_app):
     from ttd.reporting.periods import range_period
     from ttd.tui.screens.taxes import TaxPaymentModal
 
-    await init_db()
-    period = range_period(date.today() - td(days=30), date.today())
-    draft = await invoice_svc.build_draft("acme-corp", period, S())
-    invoice = await invoice_svc.persist_draft(draft, S())
-    await invoice_svc.mark_invoice(invoice.number, "paid", set_aside_rate=Decimal("0.32"))
-    await close_db()
+    async with open_test_db():
+        period = range_period(date.today() - td(days=30), date.today())
+        draft = await invoice_svc.build_draft("acme-corp", period, S())
+        invoice = await invoice_svc.persist_draft(draft, S())
+        await invoice_svc.mark_invoice(invoice.number, "paid", set_aside_rate=Decimal("0.32"))
 
     expected = compute_set_aside(draft.subtotal, Decimal("0.32"))
     quarter = TaxQuarter.from_date(date.today())

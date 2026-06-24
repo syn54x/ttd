@@ -8,6 +8,7 @@ from ttd.config.schema import Settings
 from ttd.core.errors import ConflictError, InvoicedEntryError, NotFoundError, TtdError
 from ttd.parsing.resolve import ResolvedSpan, resolve_entry
 from ttd.services.projects import get_project
+from ttd.storage.db import in_db_session
 from ttd.storage.models import Client, Entry, EntrySource, Project, pk
 
 
@@ -50,6 +51,7 @@ async def _overlapping(resolved: ResolvedSpan) -> list[Entry]:
     return out
 
 
+@in_db_session
 async def log_entry(
     spec: str,
     project_slug: str,
@@ -94,6 +96,7 @@ async def log_entry(
     return entry
 
 
+@in_db_session
 async def find_entry(uid_prefix: str) -> Entry:
     """Look up an entry by full UUID or unambiguous hex prefix."""
     needle = uid_prefix.lower().replace("-", "")
@@ -107,6 +110,7 @@ async def find_entry(uid_prefix: str) -> Entry:
     return matches[0]
 
 
+@in_db_session
 async def list_entries(
     *,
     project_slug: str | None = None,
@@ -146,6 +150,7 @@ def _ensure_unlocked(entry: Entry) -> None:
         )
 
 
+@in_db_session
 async def edit_entry(
     uid_prefix: str,
     *,
@@ -181,6 +186,7 @@ async def edit_entry(
     return entry
 
 
+@in_db_session
 async def delete_entry(uid_prefix: str) -> Entry:
     entry = await find_entry(uid_prefix)
     _ensure_unlocked(entry)

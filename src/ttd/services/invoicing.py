@@ -16,6 +16,7 @@ from ttd.invoicing.numbering import next_number
 from ttd.reporting.periods import Period
 from ttd.services.clients import get_client
 from ttd.services.projects import effective_rate
+from ttd.storage.db import in_db_session
 from ttd.storage.models import (
     Client,
     Entry,
@@ -190,6 +191,7 @@ async def _build_lines_from_entries(
     return lines
 
 
+@in_db_session
 async def build_draft(client_slug: str, period: Period, settings: Settings) -> Draft:
     client = await get_client(client_slug)
     projects = {pk(p): p for p in await Project.where(lambda p: p.client_id == client.id).all()}
@@ -219,6 +221,7 @@ async def build_draft(client_slug: str, period: Period, settings: Settings) -> D
     )
 
 
+@in_db_session
 async def persist_draft(
     draft: Draft, settings: Settings, *, number: str | None = None, now: datetime | None = None
 ) -> Invoice:
@@ -267,6 +270,7 @@ async def persist_draft(
     return invoice
 
 
+@in_db_session
 async def get_invoice(number: str) -> InvoiceView:
     invoice = await Invoice.where(lambda i: i.number == number).first()
     if invoice is None:
@@ -279,6 +283,7 @@ async def get_invoice(number: str) -> InvoiceView:
     return InvoiceView(invoice, client, lines, names)
 
 
+@in_db_session
 async def list_invoices() -> list[tuple[Invoice, Client]]:
     invoices = await Invoice.all()
     clients = {c.id: c for c in await Client.all()}
@@ -292,6 +297,7 @@ async def list_invoices() -> list[tuple[Invoice, Client]]:
 VALID_MARKS = ("sent", "paid", "void")
 
 
+@in_db_session
 async def mark_invoice(
     number: str,
     status: str,
@@ -336,6 +342,7 @@ def _clear_paid_snapshot(invoice: Invoice) -> None:
     invoice.set_aside = None
 
 
+@in_db_session
 async def preview_refresh(number: str, settings: Settings) -> RefreshPreview:
     view = await get_invoice(number)
     invoice, client = view.invoice, view.client
@@ -438,6 +445,7 @@ async def preview_refresh(number: str, settings: Settings) -> RefreshPreview:
     )
 
 
+@in_db_session
 async def apply_refresh(number: str, preview: RefreshPreview, settings: Settings) -> Invoice:
     status = enum_value(preview.invoice.status)
     if status == "void":

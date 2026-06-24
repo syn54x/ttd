@@ -1,9 +1,9 @@
 """AdaptiveFooter: every binding stays visible at any terminal width."""
 
 import pytest
+from _db import open_test_db
 
 from ttd.config.schema import Settings, StorageConfig
-from ttd.storage.db import close_db, init_db
 from ttd.tui.app import TtdApp
 
 
@@ -13,11 +13,9 @@ async def app(tmp_path, monkeypatch):
     db_path = tmp_path / "tui.db"
     monkeypatch.setenv("TTD_DB_PATH", str(db_path))
     monkeypatch.setenv("TTD_CONFIG_DIR", str(tmp_path / "config"))
-    await close_db()
-    await init_db(Settings(storage=StorageConfig(db_path=db_path)))
-    await close_db()
+    async with open_test_db(Settings(storage=StorageConfig(db_path=db_path))):
+        pass
     yield TtdApp()
-    await close_db()
 
 
 def _hidden_keys(footer) -> list:

@@ -13,6 +13,7 @@ from uuid import uuid4
 from ttd.config.schema import Settings
 from ttd.core.errors import ConflictError, NotFoundError, TtdError
 from ttd.core.taxes import TaxQuarter, compute_set_aside, quarters_of
+from ttd.storage.db import in_db_session
 from ttd.storage.models import Invoice, InvoiceStatus, TaxPayment, enum_value, pk
 
 
@@ -76,6 +77,7 @@ def paid_facts(invoice: Invoice, fallback_rate: Decimal) -> tuple[date, Decimal,
     return paid, fallback_rate, compute_set_aside(invoice.subtotal, fallback_rate)
 
 
+@in_db_session
 async def year_summary(year: int, settings: Settings) -> list[QuarterSummary]:
     """Exactly four ``QuarterSummary`` rows for ``year`` (zeros included)."""
     fallback_rate = settings.tax.set_aside_rate
@@ -112,6 +114,7 @@ async def year_summary(year: int, settings: Settings) -> list[QuarterSummary]:
     return summaries
 
 
+@in_db_session
 async def record_payment(
     quarter: TaxQuarter,
     amount: Decimal,
@@ -134,6 +137,7 @@ async def record_payment(
     return payment
 
 
+@in_db_session
 async def list_payments(year: int | None = None) -> list[TaxPayment]:
     if year is None:
         payments = await TaxPayment.all()
@@ -142,6 +146,7 @@ async def list_payments(year: int | None = None) -> list[TaxPayment]:
     return sorted(payments, key=lambda p: (p.year, p.quarter, p.paid_on))
 
 
+@in_db_session
 async def remove_payment(id_prefix: str) -> TaxPayment:
     matches = [p for p in await TaxPayment.all() if str(pk(p)).startswith(id_prefix.lower())]
     if not matches:

@@ -41,7 +41,7 @@ async def _shot(name: str, keys: list[str], *, settle: int = 4) -> None:
 
 async def _generate() -> None:
     from ttd.services import timer as timer_svc
-    from ttd.storage.db import close_db, init_db
+    from ttd.storage.db import db_lifespan
 
     await _shot("dashboard", [])
     await _shot("timesheet-week", ["2", "w"])
@@ -56,11 +56,8 @@ async def _generate() -> None:
     del os.environ["TTD_DISPLAY__THEME"]
 
     now = datetime.now()
-    await init_db()
-    try:
+    async with db_lifespan():
         await timer_svc.start_timer("api-rewrite", now=now, at=now - timedelta(minutes=85))
-    finally:
-        await close_db()
     await _shot("dashboard-timer", [])
 
 

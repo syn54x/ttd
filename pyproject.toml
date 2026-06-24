@@ -8,7 +8,7 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "ferro-orm[alembic]>=0.10.5",
+    "ferro-orm[alembic]>=0.12.3,<0.13",
     "cyclopts>=4.17",
     "rich>=14",
     "textual>=3.0",

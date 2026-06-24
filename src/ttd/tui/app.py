@@ -1,7 +1,9 @@
 """The ttd TUI: launched by bare `ttd`."""
 
+from contextlib import AsyncExitStack
 from typing import ClassVar
 
+from ferro import engines
 from textual.app import App
 
 from ttd.config import writer
@@ -33,12 +35,17 @@ class TtdApp(App):
         "taxes": TaxesScreen,
     }
 
+    _db_stack: AsyncExitStack | None = None
+
     async def on_mount(self) -> None:
         self.register_theme(TTD_DARK)
         self.register_theme(TTD_LIGHT)
         configured = get_settings().display.theme
         self.theme = configured if configured in self.available_themes else THEME_DARK
         await init_db()
+        self._db_stack = AsyncExitStack()
+        await self._db_stack.__aenter__()
+        await self._db_stack.enter_async_context(engines.session())
         await self.push_screen("dashboard")
 
     def search_themes(self) -> None:
@@ -72,6 +79,9 @@ class TtdApp(App):
         self.push_screen(ThemePickerModal(), _picked)
 
     async def on_unmount(self) -> None:
+        if self._db_stack is not None:
+            await self._db_stack.__aexit__(None, None, None)
+            self._db_stack = None
         await close_db()
 
 

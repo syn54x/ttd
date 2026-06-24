@@ -6,9 +6,11 @@ from uuid import uuid4
 
 from ttd.core.errors import ConflictError, NotFoundError
 from ttd.core.slugs import slugify
+from ttd.storage.db import in_db_session
 from ttd.storage.models import Client, Entry, Project
 
 
+@in_db_session
 async def create_client(
     name: str,
     *,
@@ -47,6 +49,7 @@ async def get_client(slug: str) -> Client:
     return client
 
 
+@in_db_session
 async def list_clients(include_archived: bool = False) -> list[Client]:
     clients = await Client.select().order_by("name").all()
     if not include_archived:
@@ -54,6 +57,7 @@ async def list_clients(include_archived: bool = False) -> list[Client]:
     return clients
 
 
+@in_db_session
 async def update_client(
     slug: str,
     *,
@@ -87,6 +91,7 @@ async def update_client(
     return client
 
 
+@in_db_session
 async def archive_client(slug: str) -> Client:
     client = await get_client(slug)
     client.archived_at = datetime.now()
@@ -95,6 +100,7 @@ async def archive_client(slug: str) -> Client:
     return client
 
 
+@in_db_session
 async def delete_client(slug: str, force: bool = False) -> None:
     """Delete a client. Refuses if projects exist unless force; never deletes invoiced work."""
     client = await get_client(slug)

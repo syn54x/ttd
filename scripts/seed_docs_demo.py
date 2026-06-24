@@ -41,11 +41,10 @@ async def seed_invoices_and_taxes() -> None:
     from ttd.config.loader import get_settings
     from ttd.core.taxes import TaxQuarter
     from ttd.services import invoicing, taxes
-    from ttd.storage.db import close_db, init_db
+    from ttd.storage.db import db_lifespan
 
     settings = get_settings()
-    await init_db(settings)
-    try:
+    async with db_lifespan(settings):
         today = date.today()
         for months_back, (status, paid_offset) in enumerate(
             [("sent", None), ("paid", 10), ("paid", 40)], start=1
@@ -71,8 +70,6 @@ async def seed_invoices_and_taxes() -> None:
             paid_on=today - timedelta(days=30),
             note="EFTPS",
         )
-    finally:
-        await close_db()
 
 
 def seed_sandbox() -> None:
