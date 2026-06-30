@@ -82,6 +82,8 @@ async def test_refresh_drops_deleted_expense(db):
     await locked.save()
     await locked.delete()
     preview = await svc.preview_refresh(invoice2.number, settings)
+    assert preview.totals_changed is True
+    assert preview.before_expenses_subtotal == Decimal("100")
     fresh = await svc.apply_refresh(invoice2.number, preview, settings)
     assert fresh.expenses_subtotal == Decimal("0")
-    assert fresh.total == Decimal("0")
+    assert fresh.total == fresh.subtotal + fresh.tax
