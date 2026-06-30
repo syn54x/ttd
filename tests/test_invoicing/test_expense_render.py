@@ -1,6 +1,9 @@
 from datetime import date
 from decimal import Decimal
 
+from fpdf import FPDF
+from pypdf import PdfReader
+
 from ttd.config.schema import Settings
 from ttd.invoicing.markdown import render_markdown
 from ttd.invoicing.pdf import render_pdf
@@ -58,3 +61,36 @@ async def test_no_expense_invoice_omits_section(db, tmp_path):
     md = render_markdown(view, settings)
     assert "Reimbursable expenses" not in md
     assert "Expenses (reimbursable)" not in md
+
+
+async def test_pdf_appends_pdf_receipt_pages(db, tmp_path):
+    await client_svc.create_client("Acme Corp", hourly_rate=Decimal("150"))
+    await project_svc.create_project("API Rewrite", "acme-corp")
+    exp = await expense_svc.add_expense(
+        "api-rewrite", "Claude", Decimal("100"), incurred_date=date(2026, 6, 15)
+    )
+    # a real 1-page PDF as the receipt
+    receipt_pdf = tmp_path / "receipt.pdf"
+    r = FPDF()
+    r.add_page()
+    r.set_font("helvetica", size=12)
+    r.cell(0, 10, "RECEIPT")
+    r.output(str(receipt_pdf))
+    await expense_svc.add_receipt(str(exp.id)[:8], receipt_pdf)
+
+    period = periods.range_period(date(2026, 6, 1), date(2026, 6, 30))
+    settings = Settings()
+    invoice = await svc.persist_draft(
+        await svc.build_draft("acme-corp", period, settings), settings
+    )
+    view = await svc.get_invoice(invoice.number)
+
+    decoded = [await expense_svc.get_receipt(str(exp.id)[:8])]
+    with_r = render_pdf(view, settings, tmp_path / "yes.pdf", receipts=decoded)
+    without = render_pdf(view, settings, tmp_path / "no.pdf", receipts=None)
+    assert len(PdfReader(str(with_r)).pages) > len(PdfReader(str(without)).pages)
+
+
+async def test_invoice_has_receipts(db, tmp_path):
+    view, _settings = await _invoice_with_expense(db)  # expense, no receipt
+    assert await svc.invoice_has_receipts(view) is False

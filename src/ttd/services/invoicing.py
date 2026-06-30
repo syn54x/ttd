@@ -21,6 +21,7 @@ from ttd.storage.models import (
     Client,
     Entry,
     Expense,
+    ExpenseReceipt,
     Invoice,
     InvoiceExpenseLine,
     InvoiceLine,
@@ -609,3 +610,13 @@ async def apply_refresh(number: str, preview: RefreshPreview, settings: Settings
     updated = await Invoice.where(lambda i: i.number == number).first()
     assert updated is not None
     return updated
+
+
+@in_db_session
+async def invoice_has_receipts(view: InvoiceView) -> bool:
+    """True if any of the invoice's linked expenses has a stored receipt."""
+    if not view.expense_lines:
+        return False
+    expense_ids = {li.expense_id for li in view.expense_lines}
+    receipts = await ExpenseReceipt.all()
+    return any(r.expense_id in expense_ids for r in receipts)
