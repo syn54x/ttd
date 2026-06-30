@@ -142,3 +142,20 @@ async def test_cli_app_registers_expense_commands():
     # Cyclopts stores name as a tuple, string, or list depending on version.
     name = expense_app.name
     assert name == "expense" or name == ["expense"] or name == ("expense",)
+
+
+async def test_add_expense_with_client_slug_disambiguates(db):
+    """add_expense(client_slug=...) picks the correct project when two clients
+    share a project with the same slug."""
+    await client_svc.create_client("Alpha Corp", hourly_rate=Decimal("100"))
+    await client_svc.create_client("Beta LLC", hourly_rate=Decimal("100"))
+    # Both clients have a project slug "website"
+    await project_svc.create_project("Website", "alpha-corp")
+    await project_svc.create_project("Website", "beta-llc")
+
+    exp = await expense_svc.add_expense("website", "Hosting", Decimal("50"), client_slug="beta-llc")
+    # The expense must belong to Beta LLC's website project
+    views = await expense_svc.list_expenses()
+    assert len(views) == 1
+    assert views[0].client.slug == "beta-llc"
+    assert views[0].expense.id == exp.id

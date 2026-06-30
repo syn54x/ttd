@@ -87,7 +87,12 @@ async def test_quick_log_modal_live_preview(seeded_app):
     async with seeded_app.run_test(size=(120, 40)) as pilot:
         await pilot.press("l")
         await pilot.pause()
-        from ttd.tui.widgets.modals import QuickLogModal
+        from ttd.tui.widgets.modals import PickerModal, QuickLogModal
+
+        # l now opens a chooser first
+        assert isinstance(seeded_app.screen, PickerModal)
+        await pilot.press("enter")  # first option = "time"
+        await pilot.pause()
 
         modal = seeded_app.screen
         assert isinstance(modal, QuickLogModal)

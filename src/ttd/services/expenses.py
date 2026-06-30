@@ -34,10 +34,11 @@ async def add_expense(
     description: str,
     amount: Decimal,
     *,
+    client_slug: str | None = None,
     incurred_date: date | None = None,
     note: str = "",
 ) -> Expense:
-    project = await get_project(project_slug)
+    project = await get_project(project_slug, client_slug)
     stamp = datetime.now()
     expense = Expense(
         id=uuid4(),
