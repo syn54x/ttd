@@ -123,14 +123,36 @@ def hours_for_row(entry: Entry) -> str:
     return entry_time_label(entry)
 
 
+@in_db_session
+async def recent_expense_suggestions(
+    *,
+    project_slug: str | None = None,
+    client_slug: str | None = None,
+    limit: int = 8,
+):
+    """Distinct (description, amount) pairs from recent expenses, newest first."""
+    from ttd.services import expenses as expense_svc
+
+    return await expense_svc.recent_expenses(
+        project_slug=project_slug, client_slug=client_slug, limit=limit
+    )
+
+
+async def expenses_for_invoice(view) -> list:
+    """Thin accessor: view.expense_lines is already loaded by get_invoice."""
+    return view.expense_lines
+
+
 __all__ = [
     "client_tree",
     "day_rows",
     "delete_entry_by_id",
+    "expenses_for_invoice",
     "heatmap_data",
     "hours_for_row",
     "pk",
     "project_options",
+    "recent_expense_suggestions",
     "split_and_log",
     "unbilled_value",
     "week_seconds",

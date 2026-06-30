@@ -65,6 +65,17 @@ class InvoiceDetailModal(ModalScreen[None]):
                     format_money(line.amount, invoice.currency),
                 )
             yield table
+            if self.view.expense_lines:
+                yield Label("expenses", classes="section-title")
+                expense_table = DataTable(id="expense-table", cursor_type="none")
+                expense_table.add_columns("date", "description", "amount")
+                for eline in self.view.expense_lines:
+                    expense_table.add_row(
+                        eline.incurred_date.strftime("%a %b %-d"),
+                        eline.description,
+                        format_money(eline.amount, invoice.currency),
+                    )
+                yield expense_table
             summary = (
                 f"issued {invoice.issued_date} · due {invoice.due_date or 'on receipt'} · "
                 f"[bold]{format_money(invoice.total, invoice.currency)}[/bold]"
