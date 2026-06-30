@@ -81,7 +81,11 @@ async def list_expenses(
         project = await get_project(project_slug, client_slug)
         expenses = [e for e in expenses if e.project_id == project.id]
     elif client_slug is not None:
-        wanted = {p.id for p in projects.values() if clients[p.client_id].slug == client_slug}
+        wanted = {
+            p.id
+            for p in projects.values()
+            if (c := clients.get(p.client_id)) is not None and c.slug == client_slug
+        }
         expenses = [e for e in expenses if e.project_id in wanted]
     if date_from is not None:
         expenses = [e for e in expenses if e.incurred_date >= date_from]
@@ -95,7 +99,10 @@ async def list_expenses(
         project = projects.get(e.project_id)
         if project is None:
             continue
-        rows.append(ExpenseView(e, project, clients[project.client_id], e.id in receipted))
+        client = clients.get(project.client_id)
+        if client is None:
+            continue
+        rows.append(ExpenseView(e, project, client, e.id in receipted))
     return rows
 
 
