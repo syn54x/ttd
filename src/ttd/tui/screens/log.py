@@ -2,7 +2,7 @@
 
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import ClassVar
+from typing import Any, ClassVar, cast
 
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -302,7 +302,7 @@ class LogScreen(TtdScreen):
         async def _save(values: dict | None) -> None:
             if values is None:
                 return
-            kwargs: dict = {}
+            kwargs: dict[str, object] = {}
             if values["description"] != initial["description"]:
                 kwargs["description"] = values["description"]
             if values["amount"] != initial["amount"]:
@@ -318,7 +318,7 @@ class LogScreen(TtdScreen):
             if not kwargs:
                 return
             try:
-                await expense_svc.edit_expense(uid, **kwargs)
+                await expense_svc.edit_expense(uid, **cast("Any", kwargs))
                 self.notify("expense updated")
             except TtdError as exc:
                 self.notify(str(exc), severity="error")
@@ -329,6 +329,10 @@ class LogScreen(TtdScreen):
     async def _delete_expense(self) -> None:
         uid = self._selected_expense_id()
         if uid is None:
+            return
+        expense = await expense_svc.find_expense(uid)
+        if expense.invoice_id is not None:
+            self.notify("expense is on an invoice — void it first", severity="warning")
             return
 
         async def _confirmed(yes: bool | None) -> None:
