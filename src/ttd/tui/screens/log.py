@@ -115,6 +115,8 @@ class LogScreen(TtdScreen):
                 key=str(v.expense.id),
             )
         if expenses:
+            # Single-currency assumption: expenses[0].client.currency used for total;
+            # multi-currency totals are a tracked follow-up.
             self.query_one("#expense-total", Label).update(
                 f"{len(expenses)} expense{'s' if len(expenses) != 1 else ''} · "
                 f"{format_money(etotal, expenses[0].client.currency)}"
@@ -214,7 +216,7 @@ class LogScreen(TtdScreen):
         async def _save(values: dict | None) -> None:
             if values is None:
                 return
-            kwargs: dict = {}
+            kwargs: dict[str, object] = {}
             if values["time"] != initial["time"]:
                 kwargs["spec"] = values["time"]
             if values["note"] != initial["note"]:
@@ -231,7 +233,7 @@ class LogScreen(TtdScreen):
                 return
             try:
                 await entry_svc.edit_entry(
-                    uid, now=datetime.now(), settings=get_settings(), **kwargs
+                    uid, now=datetime.now(), settings=get_settings(), **cast("Any", kwargs)
                 )
                 self.notify("entry updated")
             except TtdError as exc:

@@ -1,6 +1,6 @@
 """Pilot tests: drive the TUI headless and assert on real behavior."""
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -77,11 +77,10 @@ async def test_log_month_navigation(seeded_app):
         assert this_month >= 1
         await pilot.press("left_square_bracket")  # previous month
         await pilot.pause()
-        prev_month = screen.query_one("#day-table").row_count
+        assert screen.anchor_date < date.today().replace(day=1)
         await pilot.press("g")  # back to this month
         await pilot.pause()
         assert screen.query_one("#day-table").row_count == this_month
-        assert prev_month != this_month or prev_month == 0
 
 
 async def test_quick_log_modal_live_preview(seeded_app):
@@ -377,6 +376,28 @@ async def test_entry_edit_invoiced_blocked(seeded_app):
         await pilot.press("e")  # cursor starts on the invoiced (first) row
         await pilot.pause()
         assert not isinstance(seeded_app.screen, FormModal)
+
+
+async def test_log_expense_edit_invoiced_blocked(seeded_app):
+    from uuid import uuid4
+
+    async with open_test_db():
+        expenses = await expense_svc.list_expenses()
+        target = expenses[0]
+        target.expense.invoice_id = uuid4()
+        await target.expense.save()
+
+    from ttd.tui.widgets.forms import FormModal
+
+    async with seeded_app.run_test(size=(120, 40)) as pilot:
+        await pilot.press("2")  # log
+        await pilot.pause()
+        await pilot.press("tab")  # focus expenses section
+        await pilot.pause()
+        await pilot.press("e")  # attempt edit on invoiced expense
+        await pilot.pause()
+        assert not isinstance(seeded_app.screen, FormModal)
+        assert seeded_app.screen.nav_id == "log"
 
 
 async def test_clients_crud_flow(seeded_app):
@@ -767,8 +788,7 @@ async def test_log_shows_expense_section(seeded_app):
         expense_table = screen.query_one("#expense-table")
         assert expense_table.row_count == 1
         # the description appears in the rendered table
-        cells = [expense_table.get_row_at(0)]
-        assert any("Cloud hosting" in str(c) for row in cells for c in row)
+        assert any("Cloud hosting" in str(c) for c in expense_table.get_row_at(0))
 
 
 async def test_log_delete_expense(seeded_app):
