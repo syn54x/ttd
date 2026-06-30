@@ -725,3 +725,58 @@ async def test_palette_theme_applies_on_select(seeded_app):
         await pilot.pause()
         assert seeded_app.theme == THEME_LIGHT
         assert seeded_app.screen.nav_id == "dashboard"
+
+
+async def test_invoice_wizard_draft_preview_shows_expense_rows(seeded_app):
+    """_rebuild must render expense lines in the draft table and mention them in the status."""
+    from datetime import timedelta as td
+
+    from textual.widgets import Input, Static
+
+    from ttd.services import expenses as expense_svc
+    from ttd.tui.screens.invoices import NewInvoiceModal
+    from ttd.tui.widgets.modals import PickerModal
+
+    start = (NOW - td(days=14)).date().isoformat()
+    end = NOW.date().isoformat()
+
+    # Add an uninvoiced expense for the acme-corp project within the period.
+    async with open_test_db():
+        await expense_svc.add_expense(
+            "api-rewrite",
+            "Cloud hosting",
+            Decimal("49.99"),
+            incurred_date=(NOW - td(days=7)).date(),
+        )
+
+    async with seeded_app.run_test(size=(120, 40)) as pilot:
+        await pilot.press("5")
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        assert isinstance(seeded_app.screen, PickerModal)
+        await pilot.press("enter")  # first client: acme-corp
+        await pilot.pause()
+        modal = seeded_app.screen
+        assert isinstance(modal, NewInvoiceModal)
+
+        modal.query_one("#period", Input).value = f"{start} to {end}"
+        await pilot.pause()
+        await pilot.pause()
+
+        table = modal.query_one("#draft-table")
+        # There should be more rows than just the time lines (divider + expense row added).
+        assert table.row_count >= 2
+
+        # Collect all cell values from the table to search for expense markers.
+        all_cells = []
+        for row_key in table.rows:
+            row_data = table.get_row(row_key)
+            all_cells.extend(str(cell) for cell in row_data)
+        cells_text = " ".join(all_cells)
+        assert "Cloud hosting" in cells_text
+        assert "49.99" in cells_text
+        assert "reimbursable expenses" in cells_text
+
+        status = str(modal.query_one("#draft-status", Static).content)
+        assert "expense" in status

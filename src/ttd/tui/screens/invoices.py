@@ -185,11 +185,27 @@ class NewInvoiceModal(ModalScreen["svc.Draft | None"]):
                 format_money(line.rate, currency),
                 format_money(line.amount, currency),
             )
+        if draft.expense_lines:
+            table.add_row("", "-- reimbursable expenses --", "", "", "")
+            for e in draft.expense_lines:
+                table.add_row(
+                    e.incurred_date.strftime("%a %b %-d"),
+                    e.description,
+                    "",
+                    "",
+                    format_money(e.amount, currency),
+                )
         hours = format_hours(sum(line.billed_seconds for line in draft.lines))
+        expense_note = (
+            f" · {len(draft.expense_lines)} expense{'s' if len(draft.expense_lines) != 1 else ''}"
+            if draft.expense_lines
+            else ""
+        )
         status.update(
             f"[#ffb000]✓[/#ffb000] {period.label} · {entry_count} "
             f"entr{'y' if entry_count == 1 else 'ies'} → {len(draft.lines)} "
-            f"line{'s' if len(draft.lines) != 1 else ''} · {hours} · "
+            f"line{'s' if len(draft.lines) != 1 else ''} · {hours}"
+            f"{expense_note} · "
             f"[bold]{format_money(draft.total, currency)}[/bold]"
         )
         self.draft = draft
