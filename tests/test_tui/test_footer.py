@@ -28,7 +28,7 @@ def _hidden_keys(footer) -> list:
 
 async def test_footer_wraps_instead_of_clipping_when_narrow(app):
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.press("2")  # timesheet has the most bindings
+        await pilot.press("2")  # log has the most bindings
         await pilot.pause()
         await pilot.pause()
         footer = app.screen.query_one("AdaptiveFooter")
