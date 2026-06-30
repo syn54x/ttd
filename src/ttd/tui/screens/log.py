@@ -1,7 +1,7 @@
-"""Timesheet: day/week/month spans, day-grouped entries, add/edit/delete."""
+"""Log: month-scoped time entries (expenses added in Task 2); add/edit/delete."""
 
 from datetime import date, datetime, timedelta
-from typing import ClassVar, Literal, cast
+from typing import ClassVar
 
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -15,14 +15,10 @@ from ttd.core.errors import TtdError
 from ttd.core.money import format_hours
 from ttd.reporting import periods
 from ttd.services import entries as entry_svc
-from ttd.tui._data import hours_for_row, project_options, split_and_log
+from ttd.tui._data import hours_for_row, project_options
 from ttd.tui.screens._base import PREV_NEXT_GROUP, TtdScreen
 from ttd.tui.widgets.forms import FormField, FormModal
-from ttd.tui.widgets.modals import ConfirmModal, QuickLogModal
-
-Span = Literal["day", "week", "month"]
-
-SPAN_GROUP = Binding.Group("span", compact=True)
+from ttd.tui.widgets.modals import ConfirmModal
 
 
 def _entry_spec(entry) -> str:
@@ -34,29 +30,24 @@ def _entry_spec(entry) -> str:
     return f"{entry.work_date} {duration}"
 
 
-class TimesheetScreen(TtdScreen):
-    nav_id = "timesheet"
+class LogScreen(TtdScreen):
+    nav_id = "log"
 
     BINDINGS: ClassVar = [
         *TtdScreen.BINDINGS,
-        Binding("d", "span('day')", "day", group=SPAN_GROUP),
-        Binding("w", "span('week')", "week", group=SPAN_GROUP),
-        Binding("m", "span('month')", "month", group=SPAN_GROUP),
         Binding("left_square_bracket", "shift(-1)", "prev", group=PREV_NEXT_GROUP),
         Binding("right_square_bracket", "shift(1)", "next", group=PREV_NEXT_GROUP),
-        ("g", "today", "today"),
-        ("a", "add_entry", "add"),
+        ("g", "today", "this month"),
         ("e", "edit_entry", "edit"),
         ("x", "delete_entry", "delete"),
     ]
 
     def __init__(self) -> None:
         super().__init__()
-        self.span: Span = "day"
         self.anchor_date: date = date.today()
 
     def compose_content(self) -> ComposeResult:
-        with Vertical(id="timesheet"):
+        with Vertical(id="log"):
             yield Label("", id="day-title", classes="section-title")
             yield DataTable(id="day-table", cursor_type="row")
             yield Label("", id="day-total", classes="muted")
@@ -66,10 +57,6 @@ class TimesheetScreen(TtdScreen):
         table.add_columns("date", "project", "time", "hours", "note", "flags")
 
     def _period(self) -> periods.Period:
-        if self.span == "day":
-            return periods.day_period(self.anchor_date)
-        if self.span == "week":
-            return periods.week_period(self.anchor_date, get_settings().display.week_start)
         return periods.month_period(self.anchor_date)
 
     async def render_data(self) -> None:
@@ -97,32 +84,18 @@ class TimesheetScreen(TtdScreen):
                 key=str(r.entry.id),
             )
             last_day = day_label
-        title = period.label
-        if self.span == "day":
-            days_ago = (date.today() - self.anchor_date).days
-            title += {0: " · today", 1: " · yesterday"}.get(days_ago, "")
-        self.query_one("#day-title", Label).update(f"{title}  [dim]({self.span})[/dim]")
+        self.query_one("#day-title", Label).update(period.label)
         self.query_one("#day-total", Label).update(
             f"{len(rows)} entr{'y' if len(rows) == 1 else 'ies'} · {format_hours(total)}"
-            "   [dim]d/w/m span · \\[ ] prev/next · g today · a add · e edit · x delete[/dim]"
+            "   [dim]\\[ ] prev/next month · g this month · l add · e edit · x delete[/dim]"
         )
 
-    async def action_span(self, span: str) -> None:
-        if span in ("day", "week", "month"):
-            self.span = cast("Span", span)
-        await self.refresh_data()
-
     async def action_shift(self, delta: int) -> None:
-        if self.span == "day":
-            self.anchor_date += timedelta(days=delta)
-        elif self.span == "week":
-            self.anchor_date += timedelta(days=7 * delta)
+        first = self.anchor_date.replace(day=1)
+        if delta > 0:
+            self.anchor_date = (first + timedelta(days=32)).replace(day=1)
         else:
-            first = self.anchor_date.replace(day=1)
-            if delta > 0:
-                self.anchor_date = (first + timedelta(days=32)).replace(day=1)
-            else:
-                self.anchor_date = (first - timedelta(days=1)).replace(day=1)
+            self.anchor_date = (first - timedelta(days=1)).replace(day=1)
         await self.refresh_data()
 
     async def action_today(self) -> None:
@@ -135,26 +108,6 @@ class TimesheetScreen(TtdScreen):
             return None
         key = table.coordinate_to_cell_key(Coordinate(table.cursor_row, 0)).row_key.value
         return str(key) if key is not None else None
-
-    async def action_add_entry(self) -> None:
-        options = await project_options()
-        if not options:
-            self.notify("no projects yet", severity="warning")
-            return
-        prefix = ""
-        if self.span == "day" and self.anchor_date != date.today():
-            prefix = f"{self.anchor_date.isoformat()} "
-
-        async def _log(payload: dict | None) -> None:
-            if payload is None:
-                return
-            try:
-                await split_and_log(payload, now=datetime.now())
-            except TtdError as exc:
-                self.notify(str(exc), severity="error")
-            await self.refresh_data()
-
-        self.app.push_screen(QuickLogModal(options, initial_spec=prefix), _log)
 
     async def action_edit_entry(self) -> None:
         uid = self._selected_entry_id()

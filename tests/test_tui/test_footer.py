@@ -80,7 +80,7 @@ async def test_wrapped_second_row_keys_still_dispatch_actions(app):
         await pilot.pause()
         await pilot.pause()
         footer = app.screen.query_one("AdaptiveFooter")
-        target = next(k for k in footer.query("FooterKey") if k.description == "today")
+        target = next(k for k in footer.query("FooterKey") if k.description == "this month")
         assert target.region.y > footer.region.y  # really on a wrapped row
         await pilot.click(target)
         await pilot.pause()

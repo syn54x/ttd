@@ -54,7 +54,7 @@ async def test_navigation_between_screens(seeded_app):
     async with seeded_app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
         for key, nav_id in [
-            ("2", "timesheet"),
+            ("2", "log"),
             ("3", "clients"),
             ("4", "reports"),
             ("5", "invoices"),
@@ -66,21 +66,20 @@ async def test_navigation_between_screens(seeded_app):
             assert seeded_app.screen.nav_id == nav_id
 
 
-async def test_timesheet_day_navigation(seeded_app):
+async def test_log_month_navigation(seeded_app):
     async with seeded_app.run_test(size=(120, 40)) as pilot:
-        await pilot.press("2")
+        await pilot.press("2")  # log
         await pilot.pause()
         screen = seeded_app.screen
-        assert screen.query_one("#day-table").row_count == 2
-        await pilot.press("left_square_bracket")  # yesterday: no entries (even days only)
+        this_month = screen.query_one("#day-table").row_count
+        assert this_month >= 1
+        await pilot.press("left_square_bracket")  # previous month
         await pilot.pause()
-        assert screen.query_one("#day-table").row_count == 0
-        await pilot.press("left_square_bracket")  # 2 days ago: 1 entry
+        prev_month = screen.query_one("#day-table").row_count
+        await pilot.press("g")  # back to this month
         await pilot.pause()
-        assert screen.query_one("#day-table").row_count == 1
-        await pilot.press("g")
-        await pilot.pause()
-        assert screen.query_one("#day-table").row_count == 2
+        assert screen.query_one("#day-table").row_count == this_month
+        assert prev_month != this_month or prev_month == 0
 
 
 async def test_quick_log_modal_live_preview(seeded_app):
@@ -112,17 +111,19 @@ async def test_quick_log_modal_live_preview(seeded_app):
 
 async def test_quick_log_creates_entry(seeded_app):
     async with seeded_app.run_test(size=(120, 40)) as pilot:
-        await pilot.press("2")  # timesheet
+        await pilot.press("2")  # log
         await pilot.pause()
+        assert seeded_app.screen.nav_id == "log"
         before = seeded_app.screen.query_one("#day-table").row_count
-        await pilot.press("a")
+        await pilot.press("l")  # log chooser
         await pilot.pause()
-        modal = seeded_app.screen
-        modal.query_one("#spec").value = "today 7pm to 8pm"
-        modal._submit()
+        await pilot.press("enter")  # first option = time
+        await pilot.pause()
+        await pilot.press(*"today 3pm to 4pm")
+        await pilot.pause()
+        await pilot.press("enter")  # submit spec → picks first project
         await pilot.pause()
         await pilot.pause()
-        assert seeded_app.screen.nav_id == "timesheet"
         assert seeded_app.screen.query_one("#day-table").row_count == before + 1
 
 
@@ -315,34 +316,7 @@ async def test_invoices_screen_tax_columns(seeded_app, monkeypatch):
 # --- TUI enhancements: spans, entry edit, clients CRUD, invoice period -------
 
 
-async def test_timesheet_spans(seeded_app):
-    async with seeded_app.run_test(size=(120, 40)) as pilot:
-        await pilot.press("2")
-        await pilot.pause()
-        screen = seeded_app.screen
-        day_count = screen.query_one("#day-table").row_count
-        assert day_count == 2  # today's two entries
-
-        await pilot.press("m")  # month spans every seeded entry this month
-        await pilot.pause()
-        month_count = screen.query_one("#day-table").row_count
-        assert month_count >= day_count
-
-        await pilot.press("w")
-        await pilot.pause()
-        week_count = screen.query_one("#day-table").row_count
-        assert day_count <= week_count <= month_count
-
-        await pilot.press("left_square_bracket")  # previous week
-        await pilot.pause()
-        await pilot.press("g")  # back to today
-        await pilot.press("d")
-        await pilot.pause()
-        assert screen.query_one("#day-table").row_count == day_count
-        assert screen.span == "day"
-
-
-async def test_timesheet_delete_rebound_to_x(seeded_app):
+async def test_log_delete_entry(seeded_app):
     async with seeded_app.run_test(size=(120, 40)) as pilot:
         await pilot.press("2")
         await pilot.pause()
@@ -388,7 +362,8 @@ async def test_entry_edit_invoiced_blocked(seeded_app):
 
     async with open_test_db():
         rows = await entry_svc.list_entries()
-        target = next(r for r in rows if r.entry.work_date == NOW.date())
+        # Mark the first entry in date order (row 0 in month view) as invoiced.
+        target = rows[0]
         target.entry.invoice_id = uuid4()
         await target.entry.save()
 
@@ -397,7 +372,7 @@ async def test_entry_edit_invoiced_blocked(seeded_app):
     async with seeded_app.run_test(size=(120, 40)) as pilot:
         await pilot.press("2")
         await pilot.pause()
-        await pilot.press("e")  # cursor starts on the invoiced (first) entry
+        await pilot.press("e")  # cursor starts on the invoiced (first) row
         await pilot.pause()
         assert not isinstance(seeded_app.screen, FormModal)
 

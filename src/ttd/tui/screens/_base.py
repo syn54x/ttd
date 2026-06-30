@@ -20,7 +20,7 @@ from ttd.tui.widgets.modals import PickerModal, QuickLogModal
 
 NAV = [
     ("dashboard", "1 dashboard"),
-    ("timesheet", "2 timesheet"),
+    ("log", "2 log"),
     ("clients", "3 clients"),
     ("reports", "4 reports"),
     ("invoices", "5 invoices"),
@@ -66,7 +66,7 @@ class TtdScreen(Screen):
 
     BINDINGS: ClassVar = [
         Binding("1", "goto('dashboard')", "dashboard", group=SCREEN_GROUP),
-        Binding("2", "goto('timesheet')", "timesheet", group=SCREEN_GROUP),
+        Binding("2", "goto('log')", "log", group=SCREEN_GROUP),
         Binding("3", "goto('clients')", "clients", group=SCREEN_GROUP),
         Binding("4", "goto('reports')", "reports", group=SCREEN_GROUP),
         Binding("5", "goto('invoices')", "invoices", group=SCREEN_GROUP),
