@@ -76,11 +76,37 @@ def _output_paths(view: svc.InvoiceView, out: Path | None) -> Path:
     return base / f"{view.invoice.number}-{view.client.slug}"
 
 
-def _render_files(view: svc.InvoiceView, pdf: bool, md: bool, out: Path | None) -> None:
+def _resolve_formats(
+    *, pdf: bool, md: bool, receipts: bool, has_receipts: bool
+) -> tuple[bool, bool]:
+    """Decide which formats to render. Default to PDF; block markdown when an
+    invoice carries receipts (markdown can't render them)."""
+    if not pdf and not md:
+        pdf = True  # default to the canonical, sendable artifact
+    if md and receipts and has_receipts:
+        raise TtdError(
+            "This invoice has receipts; Markdown can't render them. "
+            "Drop --md, or omit --receipts to generate Markdown without them."
+        )
+    return pdf, md
+
+
+async def _render_files(
+    view: svc.InvoiceView, *, pdf: bool, md: bool, receipts: bool, out: Path | None
+) -> None:
     settings = get_settings()
     stem = _output_paths(view, out)
     if pdf:
-        path = render_pdf(view, settings, stem.with_suffix(".pdf"))
+        decoded = None
+        if receipts:
+            from ttd.services import expenses as expense_svc
+
+            decoded = []
+            for line in view.expense_lines:
+                got = await expense_svc.get_receipt(str(line.expense_id)[:8])
+                if got is not None:
+                    decoded.append(got)
+        path = render_pdf(view, settings, stem.with_suffix(".pdf"), receipts=decoded)
         success(f"Wrote {path}")
     if md:
         path = write_markdown(view, settings, stem.with_suffix(".md"))
@@ -165,6 +191,7 @@ async def create(
     number: Annotated[str | None, Parameter(help="Override the number")] = None,
     pdf: Annotated[bool, Parameter(help="Render a PDF")] = False,
     md: Annotated[bool, Parameter(help="Render Markdown")] = False,
+    receipts: Annotated[bool, Parameter(help="Append expense receipts to the PDF")] = False,
     out: Annotated[Path | None, Parameter(help="Output directory")] = None,
     dry_run: Annotated[bool, Parameter(help="Preview, change nothing")] = False,
     interactive: Annotated[
@@ -196,7 +223,10 @@ async def create(
         return
     assert view is not None
     success(f"Created invoice [accent]{view.invoice.number}[/accent]")
-    _render_files(view, pdf, md, out)
+    receipts_on = receipts or settings.invoice.attach_receipts
+    has_r = await svc.invoice_has_receipts(view)
+    pdf, md = _resolve_formats(pdf=pdf, md=md, receipts=receipts_on, has_receipts=has_r)
+    await _render_files(view, pdf=pdf, md=md, receipts=receipts_on, out=out)
 
 
 @app.command(name="list")
@@ -286,13 +316,16 @@ async def render(
     *,
     pdf: bool = False,
     md: bool = False,
+    receipts: Annotated[bool, Parameter(help="Append expense receipts to the PDF")] = False,
     out: Path | None = None,
 ) -> None:
     """(Re)render an invoice's PDF/Markdown files."""
-    if not pdf and not md:
-        pdf = md = True
     view = await svc.get_invoice(number)
-    _render_files(view, pdf, md, out)
+    settings = get_settings()
+    receipts_on = receipts or settings.invoice.attach_receipts
+    has_r = await svc.invoice_has_receipts(view)
+    pdf, md = _resolve_formats(pdf=pdf, md=md, receipts=receipts_on, has_receipts=has_r)
+    await _render_files(view, pdf=pdf, md=md, receipts=receipts_on, out=out)
 
 
 def _print_refresh_diff(preview: svc.RefreshPreview) -> None:

@@ -1,10 +1,13 @@
 from datetime import date
 from decimal import Decimal
 
+import pytest
 from fpdf import FPDF
 from pypdf import PdfReader
 
+from ttd.cli.invoices import _resolve_formats
 from ttd.config.schema import Settings
+from ttd.core.errors import TtdError
 from ttd.invoicing.markdown import render_markdown
 from ttd.invoicing.pdf import render_pdf
 from ttd.reporting import periods
@@ -94,3 +97,19 @@ async def test_pdf_appends_pdf_receipt_pages(db, tmp_path):
 async def test_invoice_has_receipts(db, tmp_path):
     view, _settings = await _invoice_with_expense(db)  # expense, no receipt
     assert await svc.invoice_has_receipts(view) is False
+
+
+def test_resolve_formats_defaults_to_pdf():
+    assert _resolve_formats(pdf=False, md=False, receipts=False, has_receipts=False) == (
+        True,
+        False,
+    )
+
+
+def test_resolve_formats_md_blocked_when_receipts_present():
+    with pytest.raises(TtdError):
+        _resolve_formats(pdf=False, md=True, receipts=True, has_receipts=True)
+
+
+def test_resolve_formats_md_ok_when_no_receipts_on_invoice():
+    assert _resolve_formats(pdf=True, md=True, receipts=True, has_receipts=False) == (True, True)
