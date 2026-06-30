@@ -2,7 +2,11 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
+import pytest
+
+from ttd.core.errors import InvoicedExpenseError
 from ttd.services import clients as client_svc
+from ttd.services import expenses as expense_svc
 from ttd.services import projects as project_svc
 from ttd.storage.models import Expense, ExpenseReceipt, pk
 
@@ -55,3 +59,43 @@ async def test_receipt_roundtrips_as_base64(db):
     )
     await receipt.save()
     assert (await ExpenseReceipt.all())[0].data_b64 == "JVBERi0xLjQ="
+
+
+async def test_add_and_list_expense(db):
+    await _project(db)
+    exp = await expense_svc.add_expense("api-rewrite", "Claude Code", Decimal("100"))
+    assert exp.amount == Decimal("100")
+    views = await expense_svc.list_expenses()
+    assert len(views) == 1
+    assert views[0].client.slug == "acme-corp"
+    assert views[0].has_receipt is False
+
+
+async def test_edit_and_delete_expense(db):
+    await _project(db)
+    exp = await expense_svc.add_expense("api-rewrite", "Claude", Decimal("100"))
+    await expense_svc.edit_expense(str(exp.id)[:8], amount=Decimal("120"))
+    assert (await expense_svc.list_expenses())[0].expense.amount == Decimal("120")
+    await expense_svc.delete_expense(str(exp.id)[:8])
+    assert await expense_svc.list_expenses() == []
+
+
+async def test_locked_expense_refuses_edit_and_delete(db):
+    await _project(db)
+    exp = await expense_svc.add_expense("api-rewrite", "Claude", Decimal("100"))
+    exp.invoice_id = uuid4()
+    await exp.save()
+    with pytest.raises(InvoicedExpenseError):
+        await expense_svc.edit_expense(str(exp.id)[:8], amount=Decimal("1"))
+    with pytest.raises(InvoicedExpenseError):
+        await expense_svc.delete_expense(str(exp.id)[:8])
+
+
+async def test_recent_expenses_returns_distinct_pairs(db):
+    await _project(db)
+    await expense_svc.add_expense("api-rewrite", "Claude Code", Decimal("100"))
+    await expense_svc.add_expense("api-rewrite", "Claude Code", Decimal("100"))
+    await expense_svc.add_expense("api-rewrite", "Figma", Decimal("15"))
+    suggestions = await expense_svc.recent_expenses(project_slug="api-rewrite")
+    pairs = [(s.description, s.amount) for s in suggestions]
+    assert pairs == [("Figma", Decimal("15")), ("Claude Code", Decimal("100"))]
