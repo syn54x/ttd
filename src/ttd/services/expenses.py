@@ -1,11 +1,14 @@
 """Logging and managing billable expenses (client chargebacks)."""
 
+import base64
+import mimetypes
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
+from pathlib import Path
 from uuid import uuid4
 
-from ttd.core.errors import ConflictError, InvoicedExpenseError, NotFoundError
+from ttd.core.errors import ConflictError, InvoicedExpenseError, NotFoundError, TtdError
 from ttd.services.projects import get_project
 from ttd.storage.db import in_db_session
 from ttd.storage.models import Client, Expense, ExpenseReceipt, Project, pk
@@ -175,3 +178,45 @@ async def recent_expenses(
         if len(out) >= limit:
             break
     return out
+
+
+MAX_RECEIPT_BYTES = 5 * 1024 * 1024  # 5 MiB — receipts are meant to be small
+
+
+@in_db_session
+async def add_receipt(uid_prefix: str, path: Path) -> ExpenseReceipt:
+    expense = await find_expense(uid_prefix)
+    raw = path.read_bytes()
+    if len(raw) > MAX_RECEIPT_BYTES:
+        raise TtdError(
+            f"Receipt is {len(raw) // 1024} KB; the limit is "
+            f"{MAX_RECEIPT_BYTES // (1024 * 1024)} MB"
+        )
+    content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    for existing in await ExpenseReceipt.where(lambda r: r.expense_id == expense.id).all():
+        await existing.delete()  # one receipt per expense; replace
+    receipt = ExpenseReceipt(
+        id=uuid4(),
+        expense_id=pk(expense),
+        filename=path.name,
+        content_type=content_type,
+        data_b64=base64.b64encode(raw).decode("ascii"),
+    )
+    await receipt.save()
+    return receipt
+
+
+@in_db_session
+async def get_receipt(uid_prefix: str) -> tuple[str, str, bytes] | None:
+    expense = await find_expense(uid_prefix)
+    receipt = await ExpenseReceipt.where(lambda r: r.expense_id == expense.id).first()
+    if receipt is None:
+        return None
+    return receipt.filename, receipt.content_type, base64.b64decode(receipt.data_b64)
+
+
+@in_db_session
+async def remove_receipt(uid_prefix: str) -> None:
+    expense = await find_expense(uid_prefix)
+    for receipt in await ExpenseReceipt.where(lambda r: r.expense_id == expense.id).all():
+        await receipt.delete()

@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from ttd.core.errors import InvoicedExpenseError
+from ttd.core.errors import InvoicedExpenseError, TtdError
 from ttd.services import clients as client_svc
 from ttd.services import expenses as expense_svc
 from ttd.services import projects as project_svc
@@ -99,3 +99,37 @@ async def test_recent_expenses_returns_distinct_pairs(db):
     suggestions = await expense_svc.recent_expenses(project_slug="api-rewrite")
     pairs = [(s.description, s.amount) for s in suggestions]
     assert pairs == [("Figma", Decimal("15")), ("Claude Code", Decimal("100"))]
+
+
+async def test_receipt_add_get_roundtrip(db, tmp_path):
+    await _project(db)
+    exp = await expense_svc.add_expense("api-rewrite", "Claude", Decimal("100"))
+    src = tmp_path / "receipt.pdf"
+    payload = b"%PDF-1.4\n\xff\xd8 binary"
+    src.write_bytes(payload)
+
+    await expense_svc.add_receipt(str(exp.id)[:8], src)
+    filename, content_type, data = await expense_svc.get_receipt(str(exp.id)[:8])
+    assert filename == "receipt.pdf"
+    assert content_type == "application/pdf"
+    assert data == payload
+    assert (await expense_svc.list_expenses())[0].has_receipt is True
+
+
+async def test_receipt_remove(db, tmp_path):
+    await _project(db)
+    exp = await expense_svc.add_expense("api-rewrite", "Claude", Decimal("100"))
+    src = tmp_path / "r.png"
+    src.write_bytes(b"\x89PNG\r\n")
+    await expense_svc.add_receipt(str(exp.id)[:8], src)
+    await expense_svc.remove_receipt(str(exp.id)[:8])
+    assert await expense_svc.get_receipt(str(exp.id)[:8]) is None
+
+
+async def test_oversized_receipt_rejected(db, tmp_path):
+    await _project(db)
+    exp = await expense_svc.add_expense("api-rewrite", "Claude", Decimal("100"))
+    big = tmp_path / "big.pdf"
+    big.write_bytes(b"0" * (expense_svc.MAX_RECEIPT_BYTES + 1))
+    with pytest.raises(TtdError):
+        await expense_svc.add_receipt(str(exp.id)[:8], big)
