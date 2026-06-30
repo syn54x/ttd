@@ -1,16 +1,17 @@
 """Import engine: validate rows, resolve slugs, dedupe, apply."""
 
 from dataclasses import dataclass, field
+from datetime import date as date_t
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from ttd.core.errors import TtdError
 from ttd.interchange.model import EntryRecord, from_raw
 from ttd.services import clients as client_svc
 from ttd.services import projects as project_svc
-from ttd.storage.models import Client, Entry, EntrySource, Project, pk
+from ttd.storage.models import Client, Entry, EntrySource, Expense, ExpenseReceipt, Project, pk
 
 OnConflict = Literal["skip", "update", "duplicate"]
 
@@ -203,3 +204,98 @@ async def _create_missing(plan: ImportPlan, metadata: dict[str, Any]) -> None:
             slug=project_slug,
             hourly_rate=Decimal(str(rate)) if rate is not None else None,
         )
+
+
+async def restore_expenses(
+    metadata: dict[str, Any],
+    *,
+    on_conflict: OnConflict = "skip",
+    create_missing: bool = False,
+) -> int:
+    """Restore expenses + receipts from a JSON backup's metadata. Returns count written.
+
+    Never sets ``invoice_id`` — imports keep ``invoice_number`` informational only,
+    mirroring entry import.
+    """
+    expenses = metadata.get("expenses", [])
+    if not expenses:
+        return 0
+
+    if create_missing:
+        # Reuse the client/project bootstrap by faking a plan of the referenced pairs.
+        plan = ImportPlan()
+        existing_clients = {c.slug for c in await Client.all()}
+        projects_present: set[tuple[str, str]] = set()
+        all_clients = {c.id: c for c in await Client.all()}
+        for p in await Project.all():
+            client = all_clients.get(p.client_id)
+            if client:
+                projects_present.add((client.slug, p.slug))
+        for row in expenses:
+            if row["client"] not in existing_clients:
+                plan.missing_clients.add(row["client"])
+            if (row["client"], row["project"]) not in projects_present:
+                plan.missing_projects.add((row["client"], row["project"]))
+        if plan.missing_clients or plan.missing_projects:
+            await _create_missing(plan, metadata)
+
+    clients = {c.slug: c for c in await Client.all()}
+    project_map: dict[tuple[str, str], Project] = {}
+    for p in await Project.all():
+        for cslug, c in clients.items():
+            if c.id == p.client_id:
+                project_map[(cslug, p.slug)] = p
+                break
+
+    existing = {str(e.id): e for e in await Expense.all()}
+    stamp = datetime.now()
+    written = 0
+    for row in expenses:
+        key = (row["client"], row["project"])
+        if key not in project_map:
+            continue  # unresolved project; skip silently
+        project = project_map[key]
+        match = existing.get(row["id"])
+        if match is not None and match.invoice_id is not None:
+            continue  # never touch invoiced expenses
+        if match is not None and on_conflict == "skip":
+            continue
+        if match is not None and on_conflict == "update":
+            match.project_id = pk(project)
+            match.incurred_date = date_t.fromisoformat(row["incurred_date"])
+            match.description = row["description"]
+            match.amount = Decimal(row["amount"])
+            match.note = row.get("note", "")
+            match.updated_at = stamp
+            await match.save()
+        else:  # new (or duplicate)
+            await Expense(
+                id=UUID(row["id"]),
+                project_id=pk(project),
+                incurred_date=date_t.fromisoformat(row["incurred_date"]),
+                description=row["description"],
+                amount=Decimal(row["amount"]),
+                note=row.get("note", ""),
+                created_at=stamp,
+                updated_at=stamp,
+            ).save()
+        written += 1
+
+    # Receipts: replace any existing receipt for that expense.
+    valid_ids = {row["id"] for row in expenses}
+    for r in metadata.get("receipts", []):
+        if r["expense_id"] not in valid_ids:
+            continue
+        expense_uuid = UUID(r["expense_id"])
+        for old in await ExpenseReceipt.where(
+            lambda rec, eid=expense_uuid: rec.expense_id == eid
+        ).all():
+            await old.delete()
+        await ExpenseReceipt(
+            id=uuid4(),
+            expense_id=expense_uuid,
+            filename=r["filename"],
+            content_type=r["content_type"],
+            data_b64=r["data_b64"],
+        ).save()
+    return written

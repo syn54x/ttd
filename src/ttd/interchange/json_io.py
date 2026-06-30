@@ -6,7 +6,7 @@ from ttd.core.errors import TtdError
 from ttd.interchange.base import Format, register
 from ttd.interchange.model import EntryRecord
 
-ENVELOPE_VERSION = 1
+ENVELOPE_VERSION = 2
 
 
 def write_json(records: list[EntryRecord], path: Path, meta: dict[str, Any]) -> None:
@@ -18,6 +18,8 @@ def write_json(records: list[EntryRecord], path: Path, meta: dict[str, Any]) -> 
         "entries": [
             {**r.to_cells(), "seconds": r.seconds, "billable": r.billable} for r in records
         ],
+        "expenses": meta.get("expenses", []),
+        "receipts": meta.get("receipts", []),
     }
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
@@ -43,7 +45,12 @@ def read_metadata(path: Path) -> dict[str, Any]:
     except (json.JSONDecodeError, OSError):
         return {}
     if isinstance(payload, dict):
-        return {"clients": payload.get("clients", []), "projects": payload.get("projects", [])}
+        return {
+            "clients": payload.get("clients", []),
+            "projects": payload.get("projects", []),
+            "expenses": payload.get("expenses", []),
+            "receipts": payload.get("receipts", []),
+        }
     return {}
 
 
