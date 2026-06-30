@@ -20,7 +20,9 @@ from ttd.storage.db import in_db_session
 from ttd.storage.models import (
     Client,
     Entry,
+    Expense,
     Invoice,
+    InvoiceExpenseLine,
     InvoiceLine,
     InvoiceStatus,
     Project,
@@ -72,11 +74,21 @@ class DraftLine:
 
 
 @dataclass
+class DraftExpenseLine:
+    expense: Expense
+    incurred_date: date
+    description: str
+    amount: Decimal
+
+
+@dataclass
 class Draft:
     client: Client
     period: Period
     lines: list[DraftLine]
+    expense_lines: list[DraftExpenseLine]
     subtotal: Decimal
+    expenses_subtotal: Decimal
     tax: Decimal
     total: Decimal
     number: str | None = None  # set when persisted
@@ -87,6 +99,7 @@ class InvoiceView:
     invoice: Invoice
     client: Client
     lines: list[InvoiceLine]
+    expense_lines: list[InvoiceExpenseLine]
     project_names: dict
 
 
@@ -122,10 +135,14 @@ def _line_key(project_id: UUID, work_date: date) -> tuple[UUID, date]:
     return (project_id, work_date)
 
 
-def _draft_totals(lines: list[DraftLine], tax_rate: Decimal) -> tuple[Decimal, Decimal, Decimal]:
+def _draft_totals(
+    lines: list[DraftLine], expense_lines: list["DraftExpenseLine"], tax_rate: Decimal
+) -> tuple[Decimal, Decimal, Decimal, Decimal]:
     subtotal = sum((line.amount for line in lines), Decimal("0"))
-    tax = to_cents(subtotal * tax_rate)
-    return subtotal, tax, subtotal + tax
+    expenses_subtotal = sum((e.amount for e in expense_lines), Decimal("0"))
+    tax = to_cents(subtotal * tax_rate)  # time only — expenses are untaxed
+    total = subtotal + tax + expenses_subtotal
+    return subtotal, expenses_subtotal, tax, total
 
 
 def _line_changed(before: InvoiceLine | None, after: DraftLine) -> frozenset[str]:
@@ -206,16 +223,33 @@ async def build_draft(client_slug: str, period: Period, settings: Settings) -> D
         and e.billable
         and period.start <= e.work_date <= period.end
     ]
-    if not entries:
-        raise TtdError(f"No uninvoiced billable entries for '{client_slug}' in {period.label}")
+    expenses = [
+        e
+        for e in await Expense.all()
+        if e.project_id in projects
+        and e.invoice_id is None
+        and period.start <= e.incurred_date <= period.end
+    ]
+    if not entries and not expenses:
+        raise TtdError(
+            f"No uninvoiced billable entries or expenses for '{client_slug}' in {period.label}"
+        )
 
     lines = await _build_lines_from_entries(entries, client, projects, settings)
-    subtotal, tax, total = _draft_totals(lines, settings.invoice.tax_rate)
+    expense_lines = [
+        DraftExpenseLine(e, e.incurred_date, e.description, e.amount)
+        for e in sorted(expenses, key=lambda e: (e.incurred_date, e.created_at))
+    ]
+    subtotal, expenses_subtotal, tax, total = _draft_totals(
+        lines, expense_lines, settings.invoice.tax_rate
+    )
     return Draft(
         client=client,
         period=period,
         lines=lines,
+        expense_lines=expense_lines,
         subtotal=subtotal,
+        expenses_subtotal=expenses_subtotal,
         tax=tax,
         total=total,
     )
@@ -244,6 +278,7 @@ async def persist_draft(
         subtotal=draft.subtotal,
         tax_rate=settings.invoice.tax_rate,
         tax=draft.tax,
+        expenses_subtotal=draft.expenses_subtotal,
         total=draft.total,
         status=InvoiceStatus.DRAFT,
         created_at=now,
@@ -266,6 +301,19 @@ async def persist_draft(
                 if entry is not None:
                     entry.invoice_id = invoice.id
                     await entry.save()
+        for eline in draft.expense_lines:
+            await InvoiceExpenseLine(
+                id=uuid4(),
+                invoice_id=pk(invoice),
+                expense_id=pk(eline.expense),
+                incurred_date=eline.incurred_date,
+                description=eline.description,
+                amount=eline.amount,
+            ).save()
+            expense = await Expense.get_or_none(pk(eline.expense))
+            if expense is not None:
+                expense.invoice_id = invoice.id
+                await expense.save()
     draft.number = final_number
     return invoice
 
@@ -279,8 +327,10 @@ async def get_invoice(number: str) -> InvoiceView:
     assert client is not None
     lines = await InvoiceLine.where(lambda li: li.invoice_id == invoice.id).all()
     lines.sort(key=lambda li: (li.work_date, li.description))
+    expense_lines = await InvoiceExpenseLine.where(lambda li: li.invoice_id == invoice.id).all()
+    expense_lines.sort(key=lambda li: (li.incurred_date, li.description))
     names = {pk(p): p.name for p in await Project.all()}
-    return InvoiceView(invoice, client, lines, names)
+    return InvoiceView(invoice, client, lines, expense_lines, names)
 
 
 @in_db_session
@@ -412,7 +462,9 @@ async def preview_refresh(number: str, settings: Settings) -> RefreshPreview:
     before_subtotal = invoice.subtotal
     before_tax = invoice.tax
     before_total = invoice.total
-    after_subtotal, after_tax, after_total = _draft_totals(after_lines, settings.invoice.tax_rate)
+    after_subtotal, _after_expenses, after_tax, after_total = _draft_totals(
+        after_lines, [], settings.invoice.tax_rate
+    )
 
     totals_changed = (
         before_subtotal != after_subtotal or before_tax != after_tax or before_total != after_total
