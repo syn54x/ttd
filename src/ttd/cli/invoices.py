@@ -360,6 +360,11 @@ def _print_refresh_diff(preview: svc.RefreshPreview) -> None:
     total_after = format_money(preview.after_total, currency)
     if preview.totals_changed:
         console.print(f"Subtotal: {sub} → [bold]{sub_after}[/bold]")
+        if preview.before_expenses_subtotal != preview.after_expenses_subtotal:
+            console.print(
+                f"Expenses: {format_money(preview.before_expenses_subtotal, currency)} → "
+                f"[bold]{format_money(preview.after_expenses_subtotal, currency)}[/bold]"
+            )
         if preview.before_tax or preview.after_tax:
             console.print(
                 f"Tax: {format_money(preview.before_tax, currency)} → "

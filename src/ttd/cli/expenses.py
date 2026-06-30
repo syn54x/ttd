@@ -10,6 +10,7 @@ from cyclopts import Parameter
 
 from ttd.cli._output import console, success, table
 from ttd.cli._run import TtdApp, with_db
+from ttd.config.loader import get_settings
 from ttd.core.errors import TtdError
 from ttd.core.money import format_money
 from ttd.services import expenses as svc
@@ -47,8 +48,6 @@ async def add(
     receipt: Annotated[Path | None, Parameter(help="Receipt file to attach")] = None,
 ) -> None:
     """Record a purchased item to bill back to the client."""
-    from ttd.config.loader import get_settings
-
     project = project or get_settings().defaults.project
     if project is None:
         raise TtdError("No project given and no [defaults].project — pass --project")
@@ -57,7 +56,8 @@ async def add(
     )
     if receipt is not None:
         await svc.add_receipt(str(expense.id)[:8], receipt)
-    success(f"Logged {format_money(expense.amount, 'USD')} — {expense.description}")
+    currency = get_settings().business.currency
+    success(f"Logged {format_money(expense.amount, currency)} — {expense.description}")
 
 
 @app.command(name="list")
@@ -116,7 +116,8 @@ async def list_(
             "",
         )
     console.print(t)
-    console.print(f"Total: [bold]{format_money(total, 'USD')}[/bold]")
+    footer_currency = rows[0].client.currency if rows else "USD"
+    console.print(f"Total: [bold]{format_money(total, footer_currency)}[/bold]")
 
 
 @app.command(name="edit")
@@ -147,7 +148,8 @@ async def edit(
 async def rm(uid: str) -> None:
     """Delete an expense (refuses if it's on an invoice)."""
     expense = await svc.delete_expense(uid)
-    success(f"Deleted expense {str(expense.id)[:8]} ({format_money(expense.amount, 'USD')})")
+    currency = get_settings().business.currency
+    success(f"Deleted expense {str(expense.id)[:8]} ({format_money(expense.amount, currency)})")
 
 
 @receipt_app.command(name="add")

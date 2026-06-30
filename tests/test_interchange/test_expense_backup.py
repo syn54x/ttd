@@ -372,3 +372,72 @@ async def test_restore_expenses_skip_leaves_receipt_intact(db, tmp_path):
     filename, _content_type, data = result
     assert filename == "receipt_a.pdf"
     assert data == b"AAA"
+
+
+# ---------------------------------------------------------------------------
+# Finding 1 — export_records(invoiced=...) filters expenses too
+# ---------------------------------------------------------------------------
+
+
+async def test_export_invoiced_filter_applies_to_expenses(db, settings):
+    """export_records(invoiced=True/False/None) must filter expenses as well as entries."""
+    import uuid as _uuid
+
+    await client_svc.create_client("Filter Corp", hourly_rate=Decimal("100"))
+    await project_svc.create_project("Filter Project", "filter-corp")
+
+    from ttd.storage.models import Expense
+
+    # Create two expenses: one uninvoiced, one with a fake invoice_id
+    await expense_svc.add_expense(
+        "filter-project", "Not invoiced", Decimal("50"), incurred_date=date(2026, 6, 1)
+    )
+    exp_inv = await expense_svc.add_expense(
+        "filter-project", "Invoiced", Decimal("75"), incurred_date=date(2026, 6, 2)
+    )
+    # Directly mark exp_inv as invoiced (simulates it being on a draft invoice)
+    fake_invoice_id = _uuid.uuid4()
+    exp_inv_row = await Expense.get_or_none(exp_inv.id)
+    assert exp_inv_row is not None
+    exp_inv_row.invoice_id = fake_invoice_id
+    await exp_inv_row.save()
+
+    # invoiced=True → only invoiced expense
+    _records, meta = await export_records(invoiced=True)
+    assert len(meta["expenses"]) == 1
+    assert meta["expenses"][0]["description"] == "Invoiced"
+
+    # invoiced=False → only free expense
+    _records, meta = await export_records(invoiced=False)
+    assert len(meta["expenses"]) == 1
+    assert meta["expenses"][0]["description"] == "Not invoiced"
+
+    # invoiced=None → both
+    _records, meta = await export_records(invoiced=None)
+    assert len(meta["expenses"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# Finding 2 — expenses-only client appears in clients_meta
+# ---------------------------------------------------------------------------
+
+
+async def test_export_includes_expense_only_client_in_meta(db, settings):
+    """A client with expenses but no entries must appear in meta['clients']."""
+    await client_svc.create_client("Expense Only", hourly_rate=Decimal("200"), currency="EUR")
+    await project_svc.create_project("Expense Project", "expense-only")
+    await expense_svc.add_expense(
+        "expense-project", "SaaS Tool", Decimal("99"), incurred_date=date(2026, 6, 10)
+    )
+
+    _records, meta = await export_records()
+
+    client_slugs = [c["slug"] for c in meta["clients"]]
+    assert "expense-only" in client_slugs
+
+    client_entry = next(c for c in meta["clients"] if c["slug"] == "expense-only")
+    assert client_entry["name"] == "Expense Only"
+    assert client_entry["currency"] == "EUR"
+
+    project_keys = [(p["client"], p["slug"]) for p in meta["projects"]]
+    assert ("expense-only", "expense-project") in project_keys

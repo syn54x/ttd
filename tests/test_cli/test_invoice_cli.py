@@ -138,3 +138,63 @@ def test_invoice_show_markdown_format(isolated_config):
     assert result.exit_code == 0, result.output
     assert "# Invoice 2026-001" in result.output
     assert "API" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Finding 3 — _print_refresh_diff shows Expenses line when expense delta changes
+# ---------------------------------------------------------------------------
+
+
+def test_print_refresh_diff_shows_expenses_line_when_expense_subtotal_changes(isolated_config):
+    """Refresh diff must print an Expenses line when before != after expense subtotal."""
+    import contextlib
+    import io
+    from datetime import date
+    from decimal import Decimal
+    from uuid import uuid4
+
+    from ttd.cli.invoices import _print_refresh_diff
+    from ttd.services.invoicing import RefreshPreview
+    from ttd.storage.models.enums import InvoiceStatus
+    from ttd.storage.models.invoice import Invoice
+
+    fake_invoice = Invoice(
+        id=uuid4(),
+        number="2026-001",
+        client_id=uuid4(),
+        period_start=date(2026, 6, 1),
+        period_end=date(2026, 6, 30),
+        issued_date=date(2026, 6, 30),
+        currency="USD",
+        subtotal=Decimal("300"),
+        tax=Decimal("0"),
+        expenses_subtotal=Decimal("100"),
+        total=Decimal("400"),
+        status=InvoiceStatus.DRAFT,
+        created_at=__import__("datetime").datetime(2026, 6, 30),
+    )
+    preview = RefreshPreview(
+        invoice=fake_invoice,
+        client=None,  # type: ignore[arg-type]
+        lines=[],
+        before_subtotal=Decimal("300"),
+        after_subtotal=Decimal("300"),
+        before_tax=Decimal("0"),
+        after_tax=Decimal("0"),
+        before_total=Decimal("400"),
+        after_total=Decimal("350"),
+        before_expenses_subtotal=Decimal("100"),
+        after_expenses_subtotal=Decimal("50"),
+        after_expense_lines=[],
+        totals_changed=True,
+        billing_fields_changed=False,
+        has_changes=True,
+        can_apply=True,
+        blocked_reason=None,
+    )
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        _print_refresh_diff(preview)
+    output = buf.getvalue()
+    assert "Expenses" in output, f"Expected 'Expenses' in output:\n{output}"
