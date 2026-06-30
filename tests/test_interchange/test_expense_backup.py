@@ -334,3 +334,41 @@ def test_read_metadata_bare_list_returns_empty(tmp_path):
     p.write_text(json.dumps([1, 2, 3]))
     result = json_io.read_metadata(p)
     assert result == {}
+
+
+# ---------------------------------------------------------------------------
+# on_conflict="skip" — receipt for skipped expense is NOT replaced
+# ---------------------------------------------------------------------------
+
+
+async def test_restore_expenses_skip_leaves_receipt_intact(db, tmp_path):
+    import base64
+
+    await client_svc.create_client("Kappa Corp")
+    await project_svc.create_project("Kappa Project", "kappa-corp")
+    exp = await expense_svc.add_expense(
+        "kappa-project", "Kappa Expense", Decimal("40"), incurred_date=date(2026, 6, 1)
+    )
+    expense_id = str(exp.id)
+
+    # Attach RECEIPT_A via a temp file.
+    receipt_a = tmp_path / "receipt_a.pdf"
+    receipt_a.write_bytes(b"AAA")
+    await expense_svc.add_receipt(expense_id[:8], receipt_a)
+
+    # Build metadata via export_records, then mutate the receipt entry to RECEIPT_B.
+    _records, meta = await export_records()
+    assert len(meta["receipts"]) == 1
+    meta["receipts"][0]["filename"] = "receipt_b.pdf"
+    meta["receipts"][0]["data_b64"] = base64.b64encode(b"BBB").decode()
+
+    # Restore with skip — expense already exists so it will be skipped.
+    written = await restore_expenses(meta, on_conflict="skip", create_missing=False)
+
+    assert written == 0
+    # The receipt should still be RECEIPT_A.
+    result = await expense_svc.get_receipt(expense_id[:8])
+    assert result is not None
+    filename, _content_type, data = result
+    assert filename == "receipt_a.pdf"
+    assert data == b"AAA"

@@ -250,6 +250,7 @@ async def restore_expenses(
     existing = {str(e.id): e for e in await Expense.all()}
     stamp = datetime.now()
     written = 0
+    written_ids: set[str] = set()
     for row in expenses:
         key = (row["client"], row["project"])
         if key not in project_map:
@@ -268,6 +269,7 @@ async def restore_expenses(
             match.note = row.get("note", "")
             match.updated_at = stamp
             await match.save()
+            written_ids.add(row["id"])
         else:  # new (or duplicate)
             await Expense(
                 id=UUID(row["id"]),
@@ -279,12 +281,12 @@ async def restore_expenses(
                 created_at=stamp,
                 updated_at=stamp,
             ).save()
+            written_ids.add(row["id"])
         written += 1
 
-    # Receipts: replace any existing receipt for that expense.
-    valid_ids = {row["id"] for row in expenses}
+    # Receipts: replace any existing receipt for expenses that were actually written.
     for r in metadata.get("receipts", []):
-        if r["expense_id"] not in valid_ids:
+        if r["expense_id"] not in written_ids:
             continue
         expense_uuid = UUID(r["expense_id"])
         for old in await ExpenseReceipt.where(
