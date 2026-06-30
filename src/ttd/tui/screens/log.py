@@ -1,6 +1,7 @@
 """Log: month-scoped time entries (expenses added in Task 2); add/edit/delete."""
 
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from typing import ClassVar
 
 from textual.app import ComposeResult
@@ -12,9 +13,10 @@ from textual.widgets import DataTable, Label
 from ttd.cli._pickers import describe_timespec, split_project_choice, validate_timespec
 from ttd.config.loader import get_settings
 from ttd.core.errors import TtdError
-from ttd.core.money import format_hours
+from ttd.core.money import format_hours, format_money
 from ttd.reporting import periods
 from ttd.services import entries as entry_svc
+from ttd.services import expenses as expense_svc
 from ttd.tui._data import hours_for_row, project_options
 from ttd.tui.screens._base import PREV_NEXT_GROUP, TtdScreen
 from ttd.tui.widgets.forms import FormField, FormModal
@@ -51,10 +53,17 @@ class LogScreen(TtdScreen):
             yield Label("", id="day-title", classes="section-title")
             yield DataTable(id="day-table", cursor_type="row")
             yield Label("", id="day-total", classes="muted")
+            yield Label("expenses", id="expense-title", classes="section-title")
+            yield DataTable(id="expense-table", cursor_type="row")
+            yield Label("", id="expense-total", classes="muted")
 
     def setup(self) -> None:
-        table = self.query_one("#day-table", DataTable)
-        table.add_columns("date", "project", "time", "hours", "note", "flags")
+        self.query_one("#day-table", DataTable).add_columns(
+            "date", "project", "time", "hours", "note", "flags"
+        )
+        self.query_one("#expense-table", DataTable).add_columns(
+            "date", "project", "description", "amount"
+        )
 
     def _period(self) -> periods.Period:
         return periods.month_period(self.anchor_date)
@@ -89,6 +98,27 @@ class LogScreen(TtdScreen):
             f"{len(rows)} entr{'y' if len(rows) == 1 else 'ies'} · {format_hours(total)}"
             "   [dim]\\[ ] prev/next month · g this month · l add · e edit · x delete[/dim]"
         )
+        expenses = await expense_svc.list_expenses(date_from=period.start, date_to=period.end)
+        etable = self.query_one("#expense-table", DataTable)
+        etable.clear()
+        etotal = Decimal("0")
+        for v in expenses:
+            etotal += v.expense.amount
+            flags = " inv" if v.expense.invoice_id is not None else ""
+            etable.add_row(
+                v.expense.incurred_date.strftime("%a %b %-d"),
+                f"{v.client.slug}/{v.project.slug}",
+                v.expense.description + flags,
+                format_money(v.expense.amount, v.client.currency),
+                key=str(v.expense.id),
+            )
+        if expenses:
+            self.query_one("#expense-total", Label).update(
+                f"{len(expenses)} expense{'s' if len(expenses) != 1 else ''} · "
+                f"{format_money(etotal, expenses[0].client.currency)}"
+            )
+        else:
+            self.query_one("#expense-total", Label).update("[dim]no expenses this month[/dim]")
 
     async def action_shift(self, delta: int) -> None:
         first = self.anchor_date.replace(day=1)

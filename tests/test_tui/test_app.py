@@ -9,6 +9,7 @@ from _db import open_test_db
 from ttd.config.schema import Settings, StorageConfig
 from ttd.services import clients as client_svc
 from ttd.services import entries as entry_svc
+from ttd.services import expenses as expense_svc
 from ttd.services import invoicing as invoice_svc
 from ttd.services import projects as project_svc
 from ttd.services import timer as timer_svc
@@ -36,6 +37,7 @@ async def seeded_app(tmp_path, monkeypatch):
             day = (NOW - timedelta(days=days_back)).date().isoformat()
             await entry_svc.log_entry(f"{day} 09:00 to 11:30", "api-rewrite", now=NOW)
         await entry_svc.log_entry("today 1pm to 2pm", "design", now=NOW, note="reviews")
+        await expense_svc.add_expense("api-rewrite", "Cloud hosting", Decimal("49.99"))
 
     yield TtdApp()
 
@@ -755,3 +757,15 @@ async def test_invoice_wizard_draft_preview_shows_expense_rows(seeded_app):
 
         status = str(modal.query_one("#draft-status", Static).content)
         assert "expense" in status
+
+
+async def test_log_shows_expense_section(seeded_app):
+    async with seeded_app.run_test(size=(120, 40)) as pilot:
+        await pilot.press("2")  # log
+        await pilot.pause()
+        screen = seeded_app.screen
+        expense_table = screen.query_one("#expense-table")
+        assert expense_table.row_count == 1
+        # the description appears in the rendered table
+        cells = [expense_table.get_row_at(0)]
+        assert any("Cloud hosting" in str(c) for row in cells for c in row)
