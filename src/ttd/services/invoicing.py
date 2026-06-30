@@ -124,6 +124,9 @@ class RefreshPreview:
     after_tax: Decimal
     before_total: Decimal
     after_total: Decimal
+    before_expenses_subtotal: Decimal
+    after_expenses_subtotal: Decimal
+    after_expense_lines: list[DraftExpenseLine]
     totals_changed: bool
     billing_fields_changed: bool
     has_changes: bool
@@ -369,6 +372,9 @@ async def mark_invoice(
             for entry in await Entry.where(lambda e: e.invoice_id == invoice.id).all():
                 entry.invoice_id = None
                 await entry.save()
+            for expense in await Expense.where(lambda e: e.invoice_id == invoice.id).all():
+                expense.invoice_id = None
+                await expense.save()
             invoice.status = InvoiceStatus.VOID
             _clear_paid_snapshot(invoice)
             await invoice.save()
@@ -401,8 +407,8 @@ async def preview_refresh(number: str, settings: Settings) -> RefreshPreview:
         raise ConflictError(f"Invoice {number} is void and can't be refreshed")
 
     entries = await Entry.where(lambda e: e.invoice_id == invoice.id).all()
-    if not entries:
-        raise TtdError(f"Invoice {number} has no linked entries")
+    if not entries and not view.lines and not view.expense_lines:
+        raise TtdError(f"Invoice {number} has no linked entries or expenses")
 
     project_ids = {e.project_id for e in entries}
     projects = {pk(p): p for p in await Project.all() if pk(p) in project_ids}
@@ -462,12 +468,22 @@ async def preview_refresh(number: str, settings: Settings) -> RefreshPreview:
     before_subtotal = invoice.subtotal
     before_tax = invoice.tax
     before_total = invoice.total
-    after_subtotal, _after_expenses, after_tax, after_total = _draft_totals(
-        after_lines, [], settings.invoice.tax_rate
+    before_expenses_subtotal = invoice.expenses_subtotal
+
+    linked_expenses = await Expense.where(lambda e: e.invoice_id == invoice.id).all()
+    after_expense_lines = [
+        DraftExpenseLine(e, e.incurred_date, e.description, e.amount)
+        for e in sorted(linked_expenses, key=lambda e: (e.incurred_date, e.created_at))
+    ]
+    after_subtotal, after_expenses, after_tax, after_total = _draft_totals(
+        after_lines, after_expense_lines, settings.invoice.tax_rate
     )
 
     totals_changed = (
-        before_subtotal != after_subtotal or before_tax != after_tax or before_total != after_total
+        before_subtotal != after_subtotal
+        or before_tax != after_tax
+        or before_total != after_total
+        or invoice.expenses_subtotal != after_expenses
     )
     has_changes = any(d.changed for d in diffs) or totals_changed
 
@@ -489,6 +505,9 @@ async def preview_refresh(number: str, settings: Settings) -> RefreshPreview:
         after_tax=after_tax,
         before_total=before_total,
         after_total=after_total,
+        before_expenses_subtotal=before_expenses_subtotal,
+        after_expenses_subtotal=after_expenses,
+        after_expense_lines=after_expense_lines,
         totals_changed=totals_changed,
         billing_fields_changed=billing_fields_changed,
         has_changes=has_changes,
@@ -565,6 +584,21 @@ async def apply_refresh(number: str, preview: RefreshPreview, settings: Settings
             for key, line in stored_by_key.items():
                 if key not in seen_keys:
                     await line.delete()
+
+            for stale in await InvoiceExpenseLine.where(
+                lambda li: li.invoice_id == invoice.id
+            ).all():
+                await stale.delete()
+            for eline in fresh.after_expense_lines:
+                await InvoiceExpenseLine(
+                    id=uuid4(),
+                    invoice_id=pk(invoice),
+                    expense_id=pk(eline.expense),
+                    incurred_date=eline.incurred_date,
+                    description=eline.description,
+                    amount=eline.amount,
+                ).save()
+            invoice.expenses_subtotal = fresh.after_expenses_subtotal
 
             invoice.subtotal = fresh.after_subtotal
             invoice.tax_rate = settings.invoice.tax_rate

@@ -46,3 +46,42 @@ async def test_persist_locks_expenses_and_stores_subtotal(db):
     view = await svc.get_invoice(invoice.number)
     assert len(view.expense_lines) == 1
     assert view.expense_lines[0].amount == Decimal("100")
+
+
+async def test_void_releases_expenses(db):
+    await _client_project(db)
+    exp = await expense_svc.add_expense(
+        "api-rewrite", "Claude", Decimal("100"), incurred_date=date(2026, 6, 15)
+    )
+    settings = Settings()
+    invoice = await svc.persist_draft(
+        await svc.build_draft("acme-corp", _june(), settings), settings
+    )
+    await svc.mark_invoice(invoice.number, "void")
+    assert (await Expense.get_or_none(exp.id)).invoice_id is None
+
+
+async def test_refresh_drops_deleted_expense(db):
+    await _client_project(db)
+    exp = await expense_svc.add_expense(
+        "api-rewrite", "Claude", Decimal("100"), incurred_date=date(2026, 6, 15)
+    )
+    settings = Settings()
+    invoice = await svc.persist_draft(
+        await svc.build_draft("acme-corp", _june(), settings), settings
+    )
+    # Release + delete the expense, then refresh.
+    await svc.mark_invoice(invoice.number, "void")
+    # Re-invoice fresh so the expense is linked again, then delete underlying expense
+    # (simulating an expense removed from the period):
+    invoice2 = await svc.persist_draft(
+        await svc.build_draft("acme-corp", _june(), settings), settings
+    )
+    locked = await Expense.get_or_none(exp.id)
+    locked.invoice_id = None
+    await locked.save()
+    await locked.delete()
+    preview = await svc.preview_refresh(invoice2.number, settings)
+    fresh = await svc.apply_refresh(invoice2.number, preview, settings)
+    assert fresh.expenses_subtotal == Decimal("0")
+    assert fresh.total == Decimal("0")
