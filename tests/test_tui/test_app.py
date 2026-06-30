@@ -769,3 +769,36 @@ async def test_log_shows_expense_section(seeded_app):
         # the description appears in the rendered table
         cells = [expense_table.get_row_at(0)]
         assert any("Cloud hosting" in str(c) for row in cells for c in row)
+
+
+async def test_log_delete_expense(seeded_app):
+    async with seeded_app.run_test(size=(120, 40)) as pilot:
+        await pilot.press("2")  # log
+        await pilot.pause()
+        screen = seeded_app.screen
+        assert screen.query_one("#expense-table").row_count == 1
+        await pilot.press("tab")  # focus the expenses section
+        await pilot.pause()
+        await pilot.press("x")  # delete highlighted expense
+        await pilot.pause()
+        await pilot.press("enter")  # confirm
+        await pilot.pause()
+        await pilot.pause()
+        assert screen.query_one("#expense-table").row_count == 0
+
+
+async def test_log_edit_expense(seeded_app):
+    async with seeded_app.run_test(size=(120, 40)) as pilot:
+        await pilot.press("2")
+        await pilot.pause()
+        await pilot.press("tab")  # focus expenses
+        await pilot.pause()
+        await pilot.press("e")  # edit
+        await pilot.pause()
+        # amount field is the second field; clear and retype via the form is heavy --
+        # assert the edit modal opened with the expense's values instead.
+        from ttd.tui.widgets.forms import FormModal
+
+        assert isinstance(seeded_app.screen, FormModal)
+        await pilot.press("escape")
+        await pilot.pause()

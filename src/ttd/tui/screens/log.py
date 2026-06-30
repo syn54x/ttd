@@ -18,7 +18,7 @@ from ttd.reporting import periods
 from ttd.services import entries as entry_svc
 from ttd.services import expenses as expense_svc
 from ttd.tui._data import hours_for_row, project_options
-from ttd.tui.screens._base import PREV_NEXT_GROUP, TtdScreen
+from ttd.tui.screens._base import PREV_NEXT_GROUP, TtdScreen, _validate_amount, _validate_date
 from ttd.tui.widgets.forms import FormField, FormModal
 from ttd.tui.widgets.modals import ConfirmModal
 
@@ -42,11 +42,13 @@ class LogScreen(TtdScreen):
         ("g", "today", "this month"),
         ("e", "edit_entry", "edit"),
         ("x", "delete_entry", "delete"),
+        ("tab", "switch_section", "switch section"),
     ]
 
     def __init__(self) -> None:
         super().__init__()
         self.anchor_date: date = date.today()
+        self.active_section: str = "time"  # "time" | "expenses"
 
     def compose_content(self) -> ComposeResult:
         with Vertical(id="log"):
@@ -132,6 +134,16 @@ class LogScreen(TtdScreen):
         self.anchor_date = date.today()
         await self.refresh_data()
 
+    async def action_switch_section(self) -> None:
+        self.active_section = "expenses" if self.active_section == "time" else "time"
+        table_id = "#expense-table" if self.active_section == "expenses" else "#day-table"
+        self.query_one(table_id, DataTable).focus()
+        # mark the active section title
+        self.query_one("#day-title", Label).remove_class("active-section")
+        self.query_one("#expense-title", Label).remove_class("active-section")
+        active_title = "#expense-title" if self.active_section == "expenses" else "#day-title"
+        self.query_one(active_title, Label).add_class("active-section")
+
     def _selected_entry_id(self) -> str | None:
         table = self.query_one("#day-table", DataTable)
         if table.row_count == 0 or table.cursor_row is None:
@@ -139,7 +151,26 @@ class LogScreen(TtdScreen):
         key = table.coordinate_to_cell_key(Coordinate(table.cursor_row, 0)).row_key.value
         return str(key) if key is not None else None
 
+    def _selected_expense_id(self) -> str | None:
+        table = self.query_one("#expense-table", DataTable)
+        if table.row_count == 0 or table.cursor_row is None:
+            return None
+        key = table.coordinate_to_cell_key(Coordinate(table.cursor_row, 0)).row_key.value
+        return str(key) if key is not None else None
+
     async def action_edit_entry(self) -> None:
+        if self.active_section == "expenses":
+            await self._edit_expense()
+        else:
+            await self._edit_entry_row()
+
+    async def action_delete_entry(self) -> None:
+        if self.active_section == "expenses":
+            await self._delete_expense()
+        else:
+            await self._delete_entry_row()
+
+    async def _edit_entry_row(self) -> None:
         uid = self._selected_entry_id()
         if uid is None:
             return
@@ -209,7 +240,7 @@ class LogScreen(TtdScreen):
 
         self.app.push_screen(form, _save)
 
-    async def action_delete_entry(self) -> None:
+    async def _delete_entry_row(self) -> None:
         uid = self._selected_entry_id()
         if uid is None:
             return
@@ -225,3 +256,89 @@ class LogScreen(TtdScreen):
             await self.refresh_data()
 
         self.app.push_screen(ConfirmModal(f"Delete entry {uid[:8]}?"), _confirmed)
+
+    async def _edit_expense(self) -> None:
+        uid = self._selected_expense_id()
+        if uid is None:
+            return
+        expense = await expense_svc.find_expense(uid)
+        if expense.invoice_id is not None:
+            self.notify("expense is on an invoice -- void it first", severity="warning")
+            return
+        options = await project_options()
+        views = await expense_svc.list_expenses(
+            date_from=expense.incurred_date, date_to=expense.incurred_date
+        )
+        current = next((v for v in views if v.expense.id == expense.id), None)
+        current_project = f"{current.client.slug}/{current.project.slug}" if current else None
+        initial = {
+            "description": expense.description,
+            "amount": str(expense.amount),
+            "date": expense.incurred_date.isoformat(),
+            "note": expense.note,
+            "project": current_project,
+        }
+        form = FormModal(
+            f"edit expense {uid[:8]}",
+            [
+                FormField("description", "Description", value=expense.description, required=True),
+                FormField(
+                    "amount",
+                    "Amount",
+                    value=str(expense.amount),
+                    validate=_validate_amount,
+                    required=True,
+                ),
+                FormField(
+                    "date", "Date (YYYY-MM-DD)", value=initial["date"], validate=_validate_date
+                ),
+                FormField("note", "Note", value=expense.note),
+                FormField(
+                    "project", "Project", kind="select", value=current_project, choices=options
+                ),
+            ],
+        )
+
+        async def _save(values: dict | None) -> None:
+            if values is None:
+                return
+            kwargs: dict = {}
+            if values["description"] != initial["description"]:
+                kwargs["description"] = values["description"]
+            if values["amount"] != initial["amount"]:
+                kwargs["amount"] = Decimal(values["amount"])
+            if values["date"] != initial["date"] and values["date"]:
+                kwargs["incurred_date"] = date.fromisoformat(values["date"])
+            if values["note"] != initial["note"]:
+                kwargs["note"] = values["note"]
+            if values["project"] and values["project"] != initial["project"]:
+                project_slug, client_slug = split_project_choice(values["project"])
+                kwargs["project_slug"] = project_slug
+                kwargs["client_slug"] = client_slug
+            if not kwargs:
+                return
+            try:
+                await expense_svc.edit_expense(uid, **kwargs)
+                self.notify("expense updated")
+            except TtdError as exc:
+                self.notify(str(exc), severity="error")
+            await self.refresh_data()
+
+        self.app.push_screen(form, _save)
+
+    async def _delete_expense(self) -> None:
+        uid = self._selected_expense_id()
+        if uid is None:
+            return
+
+        async def _confirmed(yes: bool | None) -> None:
+            if not yes:
+                return
+            try:
+                await expense_svc.delete_expense(uid)
+                self.notify("expense deleted")
+            except TtdError as exc:
+                self.notify(str(exc), severity="error")
+            await self.refresh_data()
+
+        self.app.push_screen(ConfirmModal(f"Delete expense {uid[:8]}?"), _confirmed)
