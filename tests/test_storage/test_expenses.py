@@ -133,3 +133,12 @@ async def test_oversized_receipt_rejected(db, tmp_path):
     big.write_bytes(b"0" * (expense_svc.MAX_RECEIPT_BYTES + 1))
     with pytest.raises(TtdError):
         await expense_svc.add_receipt(str(exp.id)[:8], big)
+
+
+async def test_cli_app_registers_expense_commands():
+    from ttd.cli.expenses import app as expense_app
+
+    # The sub-app must be importable and named "expense".
+    # Cyclopts stores name as a tuple, string, or list depending on version.
+    name = expense_app.name
+    assert name == "expense" or name == ["expense"] or name == ("expense",)
