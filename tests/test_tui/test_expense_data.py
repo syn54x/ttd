@@ -64,7 +64,7 @@ async def test_add_expense_entry_with_date(db):
     assert expense.incurred_date == date(2026, 6, 15)
 
 
-async def test_add_expense_entry_blank_date_defaults_to_today(db):
+async def test_add_expense_entry_missing_date_key_defaults_to_today(db):
     """Blank / absent date key means incurred today."""
     await client_svc.create_client("Acme Corp", hourly_rate=Decimal("150"))
     await project_svc.create_project("API Rewrite", "acme-corp")
@@ -81,7 +81,7 @@ async def test_add_expense_entry_blank_date_defaults_to_today(db):
     assert expense.incurred_date == date.today()
 
 
-async def test_add_expense_entry_missing_date_key_defaults_to_today(db):
+async def test_add_expense_entry_blank_date_defaults_to_today(db):
     """Explicitly blank date string also defaults to today."""
     await client_svc.create_client("Acme Corp", hourly_rate=Decimal("150"))
     await project_svc.create_project("API Rewrite", "acme-corp")

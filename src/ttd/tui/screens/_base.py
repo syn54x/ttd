@@ -241,6 +241,8 @@ class TtdScreen(Screen):
                 )
             except TtdError as exc:
                 self.notify(str(exc), severity="error")
+            except Exception as exc:
+                self.notify(str(exc), severity="error")
             await self.refresh_data()
 
         self.app.push_screen(FormModal("log expense", fields), _save)
