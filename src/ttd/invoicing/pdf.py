@@ -134,12 +134,37 @@ def render_pdf(view: InvoiceView, settings: Settings, path: Path) -> Path:
             row.cell(_money(line.rate, currency))
             row.cell(_money(line.amount, currency))
 
+    if view.expense_lines:
+        pdf.ln(3)
+        pdf.set_font("helvetica", style="B", size=9)
+        pdf.cell(0, 6, "REIMBURSABLE EXPENSES", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("helvetica", size=9)
+        with pdf.table(
+            col_widths=(20, 138, 22),
+            text_align=("LEFT", "LEFT", "RIGHT"),
+            borders_layout="HORIZONTAL_LINES",
+            line_height=6.5,
+            padding=1.2,
+        ) as etable:
+            header = etable.row()
+            pdf.set_font("helvetica", style="B", size=8)
+            for col in ("DATE", "DESCRIPTION", "AMOUNT"):
+                header.cell(col)
+            pdf.set_font("helvetica", size=9)
+            for eline in view.expense_lines:
+                row = etable.row()
+                row.cell(eline.incurred_date.strftime("%b %-d"))
+                row.cell(_latin(eline.description))
+                row.cell(_money(eline.amount, currency))
+
     # totals box
     pdf.ln(4)
     label_x = pdf.w - 18 - 70
     rows = [("Subtotal", _money(invoice.subtotal, currency))]
     if invoice.tax:
         rows.append((f"Tax ({invoice.tax_rate * 100:.2f}%)", _money(invoice.tax, currency)))
+    if invoice.expenses_subtotal:
+        rows.append(("Expenses", _money(invoice.expenses_subtotal, currency)))
     rows.append(("Total due", _money(invoice.total, currency)))
     for i, (label, value) in enumerate(rows):
         is_total = i == len(rows) - 1

@@ -99,6 +99,16 @@ def _print_draft(draft: svc.Draft) -> None:
             format_money(line.amount, currency),
         )
     console.print(t)
+    if draft.expense_lines:
+        et = table("Date", "Description", "Amount")
+        for e in draft.expense_lines:
+            et.add_row(
+                e.incurred_date.strftime("%a %b %-d"),
+                e.description,
+                format_money(e.amount, currency),
+            )
+        console.print(et)
+        console.print(f"Expenses: {format_money(draft.expenses_subtotal, currency)}")
     console.print(f"Subtotal: {format_money(draft.subtotal, currency)}")
     if draft.tax:
         console.print(f"Tax: {format_money(draft.tax, currency)}")
