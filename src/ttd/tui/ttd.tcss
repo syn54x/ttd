@@ -43,6 +43,11 @@ Screen {
     margin-bottom: 1;
 }
 
+.section-title.active-section {
+    color: $accent;
+    text-style: bold;
+}
+
 .muted {
     color: $secondary;
     margin-top: 1;
@@ -210,6 +215,11 @@ ModalScreen {
 
 .modal-box Switch {
     background: $surface;
+}
+
+.modal-box Checkbox {
+    background: $surface;
+    margin-top: 1;
 }
 
 .markdown-preview {

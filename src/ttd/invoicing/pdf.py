@@ -1,14 +1,18 @@
 """PDF invoice rendering (fpdf2). Pure python — no system dependencies."""
 
+import io
 from decimal import Decimal
 from pathlib import Path
 
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
+from pypdf import PdfReader, PdfWriter
 
 from ttd.config.schema import Settings
 from ttd.core.money import format_money
 from ttd.services.invoicing import InvoiceView
+
+Receipt = tuple[str, str, bytes]  # (filename, content_type, raw bytes)
 
 ACCENT = (255, 176, 0)  # the ttd amber
 INK = (13, 15, 18)
@@ -38,7 +42,13 @@ def _money(value: Decimal, currency: str) -> str:
         return f"{value:,.2f} {currency}"
 
 
-def render_pdf(view: InvoiceView, settings: Settings, path: Path) -> Path:
+def render_pdf(
+    view: InvoiceView,
+    settings: Settings,
+    path: Path,
+    *,
+    receipts: list[Receipt] | None = None,
+) -> Path:
     invoice, client, lines = view.invoice, view.client, view.lines
     currency = invoice.currency
 
@@ -134,12 +144,37 @@ def render_pdf(view: InvoiceView, settings: Settings, path: Path) -> Path:
             row.cell(_money(line.rate, currency))
             row.cell(_money(line.amount, currency))
 
+    if view.expense_lines:
+        pdf.ln(3)
+        pdf.set_font("helvetica", style="B", size=9)
+        pdf.cell(0, 6, "REIMBURSABLE EXPENSES", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("helvetica", size=9)
+        with pdf.table(
+            col_widths=(20, 138, 22),
+            text_align=("LEFT", "LEFT", "RIGHT"),
+            borders_layout="HORIZONTAL_LINES",
+            line_height=6.5,
+            padding=1.2,
+        ) as etable:
+            header = etable.row()
+            pdf.set_font("helvetica", style="B", size=8)
+            for col in ("DATE", "DESCRIPTION", "AMOUNT"):
+                header.cell(col)
+            pdf.set_font("helvetica", size=9)
+            for eline in view.expense_lines:
+                row = etable.row()
+                row.cell(eline.incurred_date.strftime("%b %-d"))
+                row.cell(_latin(eline.description))
+                row.cell(_money(eline.amount, currency))
+
     # totals box
     pdf.ln(4)
     label_x = pdf.w - 18 - 70
     rows = [("Subtotal", _money(invoice.subtotal, currency))]
     if invoice.tax:
         rows.append((f"Tax ({invoice.tax_rate * 100:.2f}%)", _money(invoice.tax, currency)))
+    if invoice.expenses_subtotal:
+        rows.append(("Expenses", _money(invoice.expenses_subtotal, currency)))
     rows.append(("Total due", _money(invoice.total, currency)))
     for i, (label, value) in enumerate(rows):
         is_total = i == len(rows) - 1
@@ -159,5 +194,31 @@ def render_pdf(view: InvoiceView, settings: Settings, path: Path) -> Path:
     pdf.multi_cell(0, 4, _latin(note))
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    pdf.output(str(path))
+    if not receipts:
+        pdf.output(str(path))
+        return path
+    _write_with_receipts(pdf, receipts, path)
     return path
+
+
+def _write_with_receipts(pdf: FPDF, receipts: list[Receipt], path: Path) -> None:
+    """Append image receipts as fpdf2 pages, then merge PDF receipts via pypdf."""
+    images = [r for r in receipts if r[1].startswith("image/")]
+    pdfs = [r for r in receipts if r[1] == "application/pdf"]
+
+    for _filename, _ct, data in images:
+        pdf.add_page()
+        pdf.image(io.BytesIO(data), x=18, y=24, w=pdf.w - 36)
+
+    raw = pdf.output()  # fpdf2 returns bytearray when no dest given
+    assert raw is not None
+    invoice_bytes = bytes(raw)
+
+    writer = PdfWriter()
+    for page in PdfReader(io.BytesIO(invoice_bytes)).pages:
+        writer.add_page(page)
+    for _filename, _ct, data in pdfs:
+        for page in PdfReader(io.BytesIO(data)).pages:
+            writer.add_page(page)
+    with path.open("wb") as fh:
+        writer.write(fh)

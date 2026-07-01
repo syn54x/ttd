@@ -82,7 +82,7 @@ class ThemePreview(Static):
             with Vertical(id="preview-rail"):
                 yield Label("ttd", id="preview-brand")
                 yield Label("1 dashboard", classes="preview-nav-active")
-                yield Label("2 timesheet", classes="preview-nav")
+                yield Label("2 log", classes="preview-nav")
                 yield Label("3 clients", classes="preview-nav")
             with Vertical(id="preview-content"):
                 yield Label("today", classes="preview-section")

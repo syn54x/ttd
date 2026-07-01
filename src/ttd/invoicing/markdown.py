@@ -28,6 +28,7 @@ def render_markdown(view: InvoiceView, settings: Settings) -> str:
         invoice=view.invoice,
         client=view.client,
         lines=view.lines,
+        expense_lines=view.expense_lines,
         user=settings.user,
         money=money,
         terms_days=settings.invoice.payment_terms_days,

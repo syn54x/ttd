@@ -23,12 +23,23 @@
 {{ line.description }}
 
 {% endfor %}
+{% if expense_lines %}
+## Reimbursable expenses
+
+{% for e in expense_lines -%}
+**{{ e.incurred_date.strftime("%b %-d") }}** · {{ e.description }} · **{{ money(e.amount) }}**
+
+{% endfor %}
+{% endif -%}
 
 | | |
 |---|--:|
 | Subtotal | {{ money(invoice.subtotal) }} |
 {% if invoice.tax -%}
 | Tax ({{ "%.2f" | format(invoice.tax_rate * 100) }}%) | {{ money(invoice.tax) }} |
+{% endif -%}
+{% if invoice.expenses_subtotal -%}
+| Expenses (reimbursable) | {{ money(invoice.expenses_subtotal) }} |
 {% endif -%}
 | **Total due** | **{{ money(invoice.total) }}** |
 

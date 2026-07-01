@@ -4,8 +4,9 @@ from datetime import date, time
 
 from ttd.interchange.model import EntryRecord
 from ttd.services.entries import list_entries
+from ttd.services.expenses import list_expenses
 from ttd.storage.db import in_db_session
-from ttd.storage.models import Client, Invoice, Project
+from ttd.storage.models import Client, ExpenseReceipt, Invoice, Project
 
 
 @in_db_session
@@ -45,8 +46,21 @@ async def export_records(
     ]
     records.sort(key=lambda r: (r.date, r.start or time.min, r.uid))
 
+    expense_views = await list_expenses(
+        project_slug=project_slug,
+        client_slug=client_slug,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    if invoiced is not None:
+        expense_views = [v for v in expense_views if (v.expense.invoice_id is not None) == invoiced]
+
     used_clients = {r.client for r in records}
     used_projects = {(r.client, r.project) for r in records}
+    used_clients |= {v.client.slug for v in expense_views}
+    used_projects |= {(v.client.slug, v.project.slug) for v in expense_views}
+
+    all_clients = await Client.all()
     clients_meta = [
         {
             "slug": c.slug,
@@ -55,10 +69,10 @@ async def export_records(
             "hourly_rate": str(c.hourly_rate) if c.hourly_rate is not None else None,
             "email": c.email,
         }
-        for c in await Client.all()
+        for c in all_clients
         if c.slug in used_clients
     ]
-    client_slugs = {c.id: c.slug for c in await Client.all()}
+    client_slugs = {c.id: c.slug for c in all_clients}
     projects_meta = [
         {
             "client": client_slugs.get(p.client_id),
@@ -69,4 +83,37 @@ async def export_records(
         for p in await Project.all()
         if (client_slugs.get(p.client_id), p.slug) in used_projects
     ]
-    return records, {"clients": clients_meta, "projects": projects_meta}
+
+    invoice_numbers = {i.id: i.number for i in await Invoice.all()}
+    expenses_meta = [
+        {
+            "id": str(v.expense.id),
+            "client": v.client.slug,
+            "project": v.project.slug,
+            "incurred_date": v.expense.incurred_date.isoformat(),
+            "description": v.expense.description,
+            "amount": str(v.expense.amount),
+            "note": v.expense.note,
+            "invoice_number": invoice_numbers.get(v.expense.invoice_id, "")
+            if v.expense.invoice_id
+            else "",
+        }
+        for v in expense_views
+    ]
+    expense_ids = {str(v.expense.id) for v in expense_views}
+    receipts_meta = [
+        {
+            "expense_id": str(r.expense_id),
+            "filename": r.filename,
+            "content_type": r.content_type,
+            "data_b64": r.data_b64,
+        }
+        for r in await ExpenseReceipt.all()
+        if str(r.expense_id) in expense_ids
+    ]
+    return records, {
+        "clients": clients_meta,
+        "projects": projects_meta,
+        "expenses": expenses_meta,
+        "receipts": receipts_meta,
+    }
