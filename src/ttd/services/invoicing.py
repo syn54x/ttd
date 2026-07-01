@@ -259,7 +259,7 @@ async def build_draft(client_slug: str, period: Period, settings: Settings) -> D
     actual_period = _derive_period(lines, expense_lines, fallback=period)
     return Draft(
         client=client,
-        period=actual_period,
+        period=actual_period,  # derives from billed items; requested window is only a sieve
         lines=lines,
         expense_lines=expense_lines,
         subtotal=subtotal,
@@ -614,6 +614,7 @@ async def apply_refresh(number: str, preview: RefreshPreview, settings: Settings
             billed_dates = [li.work_date for li in time_rows] + [
                 li.incurred_date for li in exp_rows
             ]
+            # re-derive the period from the surviving billed rows
             if billed_dates:
                 invoice.period_start = min(billed_dates)
                 invoice.period_end = max(billed_dates)

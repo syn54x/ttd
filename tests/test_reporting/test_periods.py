@@ -17,8 +17,9 @@ def test_this_week_and_last_week():
 
 def test_rolling_last_n_ending_today():
     today = date(2026, 6, 18)
-    assert periods.parse_period("last two weeks", today).start == date(2026, 6, 5)
-    assert periods.parse_period("last two weeks", today).end == today
+    ltw = periods.parse_period("last two weeks", today)
+    assert ltw.start == date(2026, 6, 5)
+    assert ltw.end == today
     assert periods.parse_period("last 10 days", today).start == date(2026, 6, 9)
     assert periods.parse_period("last 1 week", today).start == date(2026, 6, 12)
     assert periods.parse_period("last 3 months", today).start == date(2026, 3, 18)
@@ -62,7 +63,7 @@ def test_month_shorthands():
     inherit = periods.parse_period("june 16 - 30", today)
     assert inherit.start == date(2026, 6, 16) and inherit.end == date(2026, 6, 30)
     abbrev = periods.parse_period("jun 16 to jun 30", today)
-    assert abbrev.start == date(2026, 6, 16)
+    assert abbrev.start == date(2026, 6, 16) and abbrev.end == date(2026, 6, 30)
 
 
 def test_cross_year_wrap():

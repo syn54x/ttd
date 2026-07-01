@@ -87,7 +87,12 @@ def _parse_relative(text: str, today: date) -> "Period | None":
     if m is None:
         return None
     raw, unit = m[1], m[2].rstrip("s")
-    n = _NUMBER_WORDS.get(raw) or (int(raw) if raw.isdigit() else 0)
+    if raw.isdigit():
+        n = int(raw)
+    elif raw in _NUMBER_WORDS:
+        n = _NUMBER_WORDS[raw]
+    else:
+        raise TtdError(f"'{raw}' is not a recognised count — use a digit or one-twelve")
     if n < 1:
         raise TtdError(f"'{text}' — the count must be a positive number")
     if unit == "day":
