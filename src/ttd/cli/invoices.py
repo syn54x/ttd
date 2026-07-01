@@ -185,7 +185,10 @@ async def create(
     period: Annotated[
         str | None,
         Parameter(
-            help="Period spec: 'last month', 'this month', YYYY-MM, or YYYY-MM-DD to YYYY-MM-DD"
+            help=(
+                "Period spec: 'last month', 'this week', 'last two weeks', "
+                "'june 16 to june 30', YYYY-MM, or YYYY-MM-DD to YYYY-MM-DD"
+            )
         ),
     ] = None,
     date_from: Annotated[str | None, Parameter(name="--from")] = None,

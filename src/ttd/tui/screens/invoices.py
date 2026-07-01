@@ -133,7 +133,7 @@ class NewInvoiceModal(ModalScreen["svc.Draft | None"]):
             yield Label(f"new invoice · {self.client_slug}", classes="modal-title")
             yield Label("Period (blank = last month)", classes="field-label")
             yield Input(
-                placeholder="2026-05 · last month · this month · 2026-05-01 to 2026-05-15",
+                placeholder="last month · this week · last two weeks · june 16–30 · 2026-05",
                 id="period",
             )
             yield Static("", id="draft-status")

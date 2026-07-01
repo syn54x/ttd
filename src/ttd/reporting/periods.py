@@ -99,6 +99,126 @@ def _parse_relative(text: str, today: date) -> "Period | None":
     return range_period(start, today)
 
 
+_MONTHS = {
+    "jan": 1,
+    "january": 1,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "apr": 4,
+    "april": 4,
+    "may": 5,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "aug": 8,
+    "august": 8,
+    "sep": 9,
+    "sept": 9,
+    "september": 9,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dec": 12,
+    "december": 12,
+}
+_MON = r"[a-z]{3,9}"
+_SEP = r"(?:to|through|thru|until|till|\.\.|--|-|–|—)"
+_MM_RANGE_RE = re.compile(
+    rf"^(?P<m1>{_MON})\s+(?P<d1>\d{{1,2}})\s*{_SEP}\s*(?P<m2>{_MON})\s+(?P<d2>\d{{1,2}})"
+    rf"(?:\s+(?P<year>\d{{4}}))?$"
+)
+_MD_RANGE_RE = re.compile(
+    rf"^(?P<m1>{_MON})\s+(?P<d1>\d{{1,2}})\s*{_SEP}\s*(?P<d2>\d{{1,2}})"
+    rf"(?:\s+(?P<year>\d{{4}}))?$"
+)
+_MONTH_ONLY_RE = re.compile(rf"^(?P<m1>{_MON})(?:\s+(?P<year>\d{{4}}))?$")
+
+
+def _month_num(name: str) -> int | None:
+    return _MONTHS.get(name)
+
+
+def _range_distance(start: date, end: date, today: date) -> int:
+    if start <= today <= end:
+        return 0
+    if today < start:
+        return (start - today).days
+    return (today - end).days
+
+
+def _closest_year_range(m1: int, d1: int, m2: int, d2: int, today: date) -> Period:
+    """Build (start, end) for the closest non-future year; end wraps to +1 year
+    when the end month is earlier than the start month."""
+    best: tuple[int, date, date] | None = None
+    for y in (today.year, today.year - 1):  # this year first -> ties favor it
+        end_year = y + 1 if m2 < m1 else y
+        try:
+            start = date(y, m1, d1)
+            end = date(end_year, m2, d2)
+        except ValueError:
+            continue
+        dist = _range_distance(start, end, today)
+        if best is None or dist < best[0]:
+            best = (dist, start, end)
+    if best is None:
+        raise TtdError("Not a real date in that month-name range")
+    return range_period(best[1], best[2])
+
+
+def _fixed_year_range(m1: int, d1: int, m2: int, d2: int, year: int) -> Period:
+    end_year = year + 1 if m2 < m1 else year
+    try:
+        return range_period(date(year, m1, d1), date(end_year, m2, d2))
+    except ValueError as exc:
+        raise TtdError(f"Not a real date ({exc})") from exc
+
+
+def _closest_month_year(month: int, today: date) -> int:
+    """Closest non-future year for a whole-month reference."""
+    best: tuple[int, int] | None = None
+    for y in (today.year, today.year - 1):
+        first = date(y, month, 1)
+        last = date(y, month, calendar.monthrange(y, month)[1])
+        dist = _range_distance(first, last, today)
+        if best is None or dist < best[0]:
+            best = (dist, y)
+    assert best is not None
+    return best[1]
+
+
+def _parse_month_name(text: str, today: date) -> "Period | None":
+    # whole month: "june" / "june 2025"
+    if m := _MONTH_ONLY_RE.match(text):
+        num = _month_num(m["m1"])
+        if num is None:
+            return None
+        year = int(m["year"]) if m["year"] else _closest_month_year(num, today)
+        return month_period(date(year, num, 1), ym=f"{year}-{num:02d}")
+    # month day <sep> month day
+    if m := _MM_RANGE_RE.match(text):
+        n1, n2 = _month_num(m["m1"]), _month_num(m["m2"])
+        if n1 is None or n2 is None:
+            return None
+        d1, d2 = int(m["d1"]), int(m["d2"])
+        if m["year"]:
+            return _fixed_year_range(n1, d1, n2, d2, int(m["year"]))
+        return _closest_year_range(n1, d1, n2, d2, today)
+    # month day <sep> day  (inherit month)
+    if m := _MD_RANGE_RE.match(text):
+        n1 = _month_num(m["m1"])
+        if n1 is None:
+            return None
+        d1, d2 = int(m["d1"]), int(m["d2"])
+        if m["year"]:
+            return _fixed_year_range(n1, d1, n1, d2, int(m["year"]))
+        return _closest_year_range(n1, d1, n1, d2, today)
+    return None
+
+
 def parse_period(text: str, today: date, *, week_start: str = "monday") -> Period:
     """Parse a human period spec. Supports: '' / 'last month' / 'this month' /
     'this week' / 'last week' / 'last <N> days|weeks|months' / 'YYYY-MM' /
@@ -121,7 +241,9 @@ def parse_period(text: str, today: date, *, week_start: str = "monday") -> Perio
             raise TtdError(f"Not a real date in '{text}' ({exc})") from exc
     if relative := _parse_relative(text, today):
         return relative
+    if month_name := _parse_month_name(text, today):
+        return month_name
     raise TtdError(
         f"Can't read period '{text}' — try '2026-05', 'last month', 'this week', "
-        "'last two weeks', or '2026-05-01 to 2026-05-15'"
+        "'last two weeks', 'june 16 to june 30', or '2026-05-01 to 2026-05-15'"
     )

@@ -31,7 +31,7 @@ Invoice a client's uninvoiced billable work (defaults to last month).
 
 * `--client`: Client slug
 * `--month`: YYYY-MM
-* `--period`: Period spec: 'last month', 'this month', YYYY-MM, or YYYY-MM-DD to YYYY-MM-DD
+* `--period`: Period spec: 'last month', 'this week', 'last two weeks', 'june 16 to june 30', YYYY-MM, or YYYY-MM-DD to YYYY-MM-DD
 * `--from`:
 * `--to`:
 * `--number`: Override the number

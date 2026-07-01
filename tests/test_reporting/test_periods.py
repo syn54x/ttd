@@ -1,6 +1,9 @@
 # tests/test_reporting/test_periods.py
 from datetime import date
 
+import pytest
+
+from ttd.core.errors import TtdError
 from ttd.reporting import periods
 
 
@@ -31,3 +34,49 @@ def test_week_start_sunday():
     today = date(2026, 6, 18)
     tw = periods.parse_period("this week", today, week_start="sunday")
     assert tw.start == date(2026, 6, 14)  # Sunday
+
+
+def test_month_name_range_closest_year():
+    # today mid-2026
+    today = date(2026, 7, 1)
+    p = periods.parse_period("june 16 to june 30", today)
+    assert p.start == date(2026, 6, 16) and p.end == date(2026, 6, 30)
+
+
+def test_closest_year_examples():
+    # Jan 1 2026, "dec 15 - dec 31" -> Dec 2025 (last year is closest)
+    p = periods.parse_period("dec 15 - dec 31", date(2026, 1, 1))
+    assert p.start == date(2025, 12, 15) and p.end == date(2025, 12, 31)
+    # June 30 2026, "june 16 - june 30" -> this year (today inside)
+    p = periods.parse_period("june 16 - june 30", date(2026, 6, 30))
+    assert p.start == date(2026, 6, 16)
+    # June 1 2026, "june 16 - june 30" -> this year (near future beats a year ago)
+    p = periods.parse_period("june 16 - june 30", date(2026, 6, 1))
+    assert p.start == date(2026, 6, 16)
+
+
+def test_month_shorthands():
+    today = date(2026, 7, 1)
+    whole = periods.parse_period("june", today)
+    assert whole.start == date(2026, 6, 1) and whole.end == date(2026, 6, 30)
+    inherit = periods.parse_period("june 16 - 30", today)
+    assert inherit.start == date(2026, 6, 16) and inherit.end == date(2026, 6, 30)
+    abbrev = periods.parse_period("jun 16 to jun 30", today)
+    assert abbrev.start == date(2026, 6, 16)
+
+
+def test_cross_year_wrap():
+    # "dec 28 to jan 3" — end month wraps into the next year
+    p = periods.parse_period("dec 28 to jan 3", date(2026, 1, 15))
+    # closest-year for start Dec: Dec 2025 (ended ~2 weeks ago) beats Dec 2026
+    assert p.start == date(2025, 12, 28) and p.end == date(2026, 1, 3)
+
+
+def test_explicit_year_honored():
+    p = periods.parse_period("june 16 to june 30 2024", date(2026, 7, 1))
+    assert p.start == date(2024, 6, 16) and p.end == date(2024, 6, 30)
+
+
+def test_bad_month_name_errors():
+    with pytest.raises(TtdError):
+        periods.parse_period("smarch 3 to smarch 9", date(2026, 7, 1))
