@@ -217,6 +217,11 @@ ModalScreen {
     background: $surface;
 }
 
+.modal-box Checkbox {
+    background: $surface;
+    margin-top: 1;
+}
+
 .markdown-preview {
     height: 80%;
 }

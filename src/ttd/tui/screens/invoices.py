@@ -11,7 +11,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, DataTable, Input, Label, Markdown, Static, Switch
+from textual.widgets import Button, Checkbox, DataTable, Input, Label, Markdown, Static
 
 from ttd.config.loader import get_settings
 from ttd.core.errors import TtdError
@@ -354,26 +354,27 @@ class RenderFormatModal(ModalScreen[dict | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="modal-box"):
-            yield Label("render invoice", classes="modal-title")
+            yield Label("Render Invoice", classes="modal-title")
+            yield Checkbox(
+                "Include receipts",
+                value=self.has_receipts,
+                id="receipts",
+                disabled=not self.has_receipts,
+            )
+            yield Label("Format", classes="field-label")
             with Horizontal(classes="form-toggle-row"):
-                yield Switch(value=True, id="pdf")
-                yield Label("PDF", classes="field-label")
-            with Horizontal(classes="form-toggle-row"):
-                yield Switch(value=False, id="md", disabled=self.has_receipts)
-                yield Label("Markdown", classes="field-label")
-            with Horizontal(classes="form-toggle-row"):
-                yield Switch(value=self.has_receipts, id="receipts", disabled=not self.has_receipts)
-                yield Label("Include receipts", classes="field-label")
+                yield Checkbox("PDF", value=True, id="pdf")
+                yield Checkbox("Markdown", value=False, id="md", disabled=self.has_receipts)
             yield Static("", id="render-error", classes="form-error")
             with Horizontal(classes="modal-buttons"):
                 yield Button("Render", variant="primary", id="render")
                 yield Button("Cancel", id="cancel")
 
-    @on(Switch.Changed, "#receipts")
-    def _receipts_changed(self, event: Switch.Changed) -> None:
-        md = self.query_one("#md", Switch)
+    @on(Checkbox.Changed, "#receipts")
+    def _receipts_changed(self, event: Checkbox.Changed) -> None:
+        md = self.query_one("#md", Checkbox)
         if event.value:
-            self.query_one("#pdf", Switch).value = True
+            self.query_one("#pdf", Checkbox).value = True
             md.value = False
             md.disabled = True
         else:
@@ -381,9 +382,9 @@ class RenderFormatModal(ModalScreen[dict | None]):
 
     @on(Button.Pressed, "#render")
     def _do_render(self) -> None:
-        pdf = self.query_one("#pdf", Switch).value
-        md = self.query_one("#md", Switch).value
-        receipts = self.query_one("#receipts", Switch).value
+        pdf = self.query_one("#pdf", Checkbox).value
+        md = self.query_one("#md", Checkbox).value
+        receipts = self.query_one("#receipts", Checkbox).value
         if not pdf and not md:
             self.query_one("#render-error", Static).update("[red]Choose at least one format[/red]")
             return

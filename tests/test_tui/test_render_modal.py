@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 
 from textual.app import App
-from textual.widgets import Static, Switch
+from textual.widgets import Checkbox, Static
 
 from ttd.config.schema import InvoiceConfig, Settings
 
@@ -35,13 +35,13 @@ async def test_modal_receipts_on_disables_markdown():
         await pilot.pause()
         assert isinstance(app.screen, RenderFormatModal)
         # receipts enabled + on; markdown disabled at start (receipts default on)
-        assert modal.query_one("#receipts", Switch).disabled is False
-        assert modal.query_one("#receipts", Switch).value is True
-        assert modal.query_one("#md", Switch).disabled is True
+        assert modal.query_one("#receipts", Checkbox).disabled is False
+        assert modal.query_one("#receipts", Checkbox).value is True
+        assert modal.query_one("#md", Checkbox).disabled is True
         # turn receipts off -> markdown re-enabled
-        modal.query_one("#receipts", Switch).value = False
+        modal.query_one("#receipts", Checkbox).value = False
         await pilot.pause()
-        assert modal.query_one("#md", Switch).disabled is False
+        assert modal.query_one("#md", Checkbox).disabled is False
 
 
 async def test_modal_no_receipts_disables_receipts_switch():
@@ -51,8 +51,8 @@ async def test_modal_no_receipts_disables_receipts_switch():
     app = ModalHostApp(modal)
     async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
-        assert modal.query_one("#receipts", Switch).disabled is True
-        assert modal.query_one("#md", Switch).disabled is False
+        assert modal.query_one("#receipts", Checkbox).disabled is True
+        assert modal.query_one("#md", Checkbox).disabled is False
 
 
 async def test_write_selected_formats_pdf_with_receipts(db, tmp_path):
@@ -104,9 +104,9 @@ async def test_render_modal_no_format_selected():
     async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
         assert isinstance(app.screen, RenderFormatModal)
-        # turn both switches off
-        modal.query_one("#pdf", Switch).value = False
-        modal.query_one("#md", Switch).value = False
+        # turn both checkboxes off
+        modal.query_one("#pdf", Checkbox).value = False
+        modal.query_one("#md", Checkbox).value = False
         await pilot.pause()
         # click render button
         await pilot.click("#render")
