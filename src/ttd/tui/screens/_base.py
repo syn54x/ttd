@@ -73,7 +73,7 @@ class TtdScreen(Screen):
         Binding("6", "goto('taxes')", "taxes", group=SCREEN_GROUP),
         Binding("s", "toggle_timer", "start/stop"),
         Binding("l", "quick_log", "log"),
-        Binding("t", "pick_theme", "theme"),
+        Binding("ctrl+t", "pick_theme", "theme"),
         Binding("r", "refresh", "refresh"),
         Binding("q", "quit_app", "quit"),
     ]

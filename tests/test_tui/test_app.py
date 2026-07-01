@@ -619,23 +619,23 @@ async def test_taxes_screen_shows_quarters_and_payment_modal(seeded_app):
         assert seeded_app.screen.nav_id == "taxes"
 
 
-async def test_t_key_opens_theme_picker(seeded_app):
+async def test_ctrl_t_opens_theme_picker(seeded_app):
     from ttd.tui.widgets.theme_picker import ThemePickerModal
 
     async with seeded_app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
-        await pilot.press("t")
+        await pilot.press("ctrl+t")
         await pilot.pause()
         assert isinstance(seeded_app.screen, ThemePickerModal)
 
 
-async def test_t_key_save_theme(seeded_app):
+async def test_ctrl_t_save_theme(seeded_app):
     from ttd.config.loader import get_settings
     from ttd.tui.widgets.theme_picker import ThemePickerModal
 
     async with seeded_app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
-        await pilot.press("t")
+        await pilot.press("ctrl+t")
         await pilot.pause()
         assert isinstance(seeded_app.screen, ThemePickerModal)
         await pilot.press(*list("ttd-light"))
@@ -645,6 +645,36 @@ async def test_t_key_save_theme(seeded_app):
         await pilot.pause()
         assert get_settings().display.theme == THEME_LIGHT
         assert seeded_app.screen.nav_id == "dashboard"
+
+
+async def test_invoices_t_marks_sent_not_theme(seeded_app):
+    # regression: on the invoices screen `t` marks the selected invoice sent;
+    # the theme picker moved to ctrl+t so it no longer shadows this binding.
+    from datetime import date
+    from datetime import timedelta as td
+
+    from ttd.config.schema import Settings as S
+    from ttd.reporting.periods import range_period
+    from ttd.storage.models import enum_value
+    from ttd.tui.widgets.theme_picker import ThemePickerModal
+
+    async with open_test_db():
+        period = range_period(date.today() - td(days=30), date.today())
+        settings = S(business={"default_hourly_rate": 100})
+        draft = await invoice_svc.build_draft("acme-corp", period, settings)
+        number = (await invoice_svc.persist_draft(draft, settings)).number
+
+    async with seeded_app.run_test(size=(120, 40)) as pilot:
+        await pilot.press("5")
+        await pilot.pause()
+        assert seeded_app.screen.query_one("#invoice-table").row_count == 1
+        await pilot.press("t")
+        await pilot.pause()
+        assert not isinstance(seeded_app.screen, ThemePickerModal)
+
+    async with open_test_db():
+        view = await invoice_svc.get_invoice(number)
+        assert enum_value(view.invoice.status) == "sent"
 
 
 async def test_palette_theme_previews_and_reverts(seeded_app):
