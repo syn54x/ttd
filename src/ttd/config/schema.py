@@ -48,6 +48,8 @@ class InvoiceConfig(_Section):
     # skips validators on defaults otherwise, which left a literal "~" path
     output_dir: Path = Field(default=Path("~/Documents/invoices"), validate_default=True)
     """Directory where rendered invoices are written."""
+    attach_receipts: bool = False
+    """Append expense receipts as pages when rendering invoice PDFs."""
 
     _tax = field_validator("tax_rate", mode="before")(_to_decimal)
 

@@ -53,6 +53,16 @@ def register(app: TtdApp) -> None:
                 plan, create_missing=create_missing, metadata=metadata
             )
 
+        # Restore expenses from JSON metadata (skip on dry_run or non-JSON files).
+        if not dry_run and metadata.get("expenses"):
+            from ttd.interchange.importer import restore_expenses
+
+            n = await restore_expenses(
+                metadata, on_conflict=conflict_mode, create_missing=create_missing
+            )
+            if n:
+                success(f"Restored {n} expense{'s' if n != 1 else ''}")
+
         t = table("Action", "Rows")
         t.add_row("new", str(len(plan.new)))
         t.add_row("update", str(len(plan.update)))

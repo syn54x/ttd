@@ -17,6 +17,10 @@ class InvoicedEntryError(TtdError):
     """Attempted to modify an entry that is locked to an invoice."""
 
 
+class InvoicedExpenseError(TtdError):
+    """Attempted to modify an expense that is locked to an invoice."""
+
+
 class ConfigError(TtdError):
     """Invalid or unwritable configuration."""
 

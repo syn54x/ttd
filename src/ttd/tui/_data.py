@@ -1,6 +1,7 @@
 """Data helpers shared by TUI screens (thin wrappers over services)."""
 
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 
 from ttd.config.loader import get_settings
 from ttd.core.errors import TtdError
@@ -8,9 +9,10 @@ from ttd.core.money import format_hours, format_money
 from ttd.reporting.render import entry_time_label
 from ttd.services import clients as client_svc
 from ttd.services import entries as entry_svc
+from ttd.services import expenses as expense_svc
 from ttd.services import projects as project_svc
 from ttd.storage.db import in_db_session
-from ttd.storage.models import Entry, pk
+from ttd.storage.models import Entry, Expense, pk
 
 
 @in_db_session
@@ -45,6 +47,27 @@ async def split_and_log(payload: dict, *, now: datetime) -> Entry:
         note=payload.get("note", ""),
         settings=get_settings(),
         force=payload.get("force", False),
+    )
+
+
+@in_db_session
+async def add_expense_entry(payload: dict) -> Expense:
+    """Create an expense from a FormModal payload dict.
+
+    Expected keys: project ('client/project'), description, amount (str),
+    date (YYYY-MM-DD string or blank/absent → today), note (optional).
+    """
+    client_slug, project_slug = payload["project"].split("/", 1)
+    amount = Decimal(payload["amount"])
+    raw_date = payload.get("date", "")
+    incurred: date | None = date.fromisoformat(raw_date) if raw_date else None
+    return await expense_svc.add_expense(
+        project_slug,
+        payload["description"],
+        amount,
+        client_slug=client_slug,
+        incurred_date=incurred,
+        note=payload.get("note", ""),
     )
 
 
@@ -123,14 +146,37 @@ def hours_for_row(entry: Entry) -> str:
     return entry_time_label(entry)
 
 
+@in_db_session
+async def recent_expense_suggestions(
+    *,
+    project_slug: str | None = None,
+    client_slug: str | None = None,
+    limit: int = 8,
+):
+    """Distinct (description, amount) pairs from recent expenses, newest first."""
+    from ttd.services import expenses as expense_svc
+
+    return await expense_svc.recent_expenses(
+        project_slug=project_slug, client_slug=client_slug, limit=limit
+    )
+
+
+async def expenses_for_invoice(view) -> list:
+    """Thin accessor: view.expense_lines is already loaded by get_invoice."""
+    return view.expense_lines
+
+
 __all__ = [
+    "add_expense_entry",
     "client_tree",
     "day_rows",
     "delete_entry_by_id",
+    "expenses_for_invoice",
     "heatmap_data",
     "hours_for_row",
     "pk",
     "project_options",
+    "recent_expense_suggestions",
     "split_and_log",
     "unbilled_value",
     "week_seconds",

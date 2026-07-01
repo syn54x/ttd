@@ -20,6 +20,7 @@ def _register_subcommands() -> None:
         config_cmds,
         db_cmds,
         entries,
+        expenses,
         export,
         import_,
         invoices,
@@ -33,6 +34,7 @@ def _register_subcommands() -> None:
     app.command(clients.app)
     app.command(projects.app)
     app.command(entries.app)
+    app.command(expenses.app)
     app.command(reports.app)
     app.command(invoices.app)
     app.command(taxes.app)

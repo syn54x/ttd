@@ -14,9 +14,9 @@ from ttd.tui.screens._base import TtdScreen
 from ttd.tui.screens.clients import ClientsScreen
 from ttd.tui.screens.dashboard import DashboardScreen
 from ttd.tui.screens.invoices import InvoicesScreen
+from ttd.tui.screens.log import LogScreen
 from ttd.tui.screens.reports import ReportsScreen
 from ttd.tui.screens.taxes import TaxesScreen
-from ttd.tui.screens.timesheet import TimesheetScreen
 from ttd.tui.theme import THEME_DARK, TTD_DARK, TTD_LIGHT
 from ttd.tui.widgets.modals import ConfirmModal
 from ttd.tui.widgets.theme_picker import ThemePickerModal
@@ -28,7 +28,7 @@ class TtdApp(App):
 
     SCREENS: ClassVar = {
         "dashboard": DashboardScreen,
-        "timesheet": TimesheetScreen,
+        "log": LogScreen,
         "clients": ClientsScreen,
         "reports": ReportsScreen,
         "invoices": InvoicesScreen,

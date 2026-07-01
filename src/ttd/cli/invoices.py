@@ -60,7 +60,9 @@ def _resolve_period(
     if period is not None:
         if month is not None or date_from is not None or date_to is not None:
             raise TtdError("Pass --period alone, not with --month or --from/--to")
-        return periods.parse_period(period, datetime.now().date())
+        return periods.parse_period(
+            period, datetime.now().date(), week_start=get_settings().display.week_start
+        )
     if month is not None:
         return periods.month_period(datetime.now().date(), ym=month)
     if date_from is not None and date_to is not None:
@@ -76,11 +78,33 @@ def _output_paths(view: svc.InvoiceView, out: Path | None) -> Path:
     return base / f"{view.invoice.number}-{view.client.slug}"
 
 
-def _render_files(view: svc.InvoiceView, pdf: bool, md: bool, out: Path | None) -> None:
+def _resolve_formats(
+    *, pdf: bool, md: bool, receipts: bool, has_receipts: bool
+) -> tuple[bool, bool]:
+    """Decide which formats to render. Default to PDF; block markdown when an
+    invoice carries receipts (markdown can't render them)."""
+    if not pdf and not md:
+        pdf = True  # default to the canonical, sendable artifact
+    if md and receipts and has_receipts:
+        raise TtdError(
+            "This invoice has receipts; Markdown can't render them. "
+            "Drop --md, or omit --receipts to generate Markdown without them."
+        )
+    return pdf, md
+
+
+async def _render_files(
+    view: svc.InvoiceView, *, pdf: bool, md: bool, receipts: bool, out: Path | None
+) -> None:
     settings = get_settings()
     stem = _output_paths(view, out)
     if pdf:
-        path = render_pdf(view, settings, stem.with_suffix(".pdf"))
+        decoded = None
+        if receipts:
+            from ttd.services.expenses import load_invoice_receipts
+
+            decoded = await load_invoice_receipts(view.expense_lines)
+        path = render_pdf(view, settings, stem.with_suffix(".pdf"), receipts=decoded)
         success(f"Wrote {path}")
     if md:
         path = write_markdown(view, settings, stem.with_suffix(".md"))
@@ -99,6 +123,16 @@ def _print_draft(draft: svc.Draft) -> None:
             format_money(line.amount, currency),
         )
     console.print(t)
+    if draft.expense_lines:
+        et = table("Date", "Description", "Amount")
+        for e in draft.expense_lines:
+            et.add_row(
+                e.incurred_date.strftime("%a %b %-d"),
+                e.description,
+                format_money(e.amount, currency),
+            )
+        console.print(et)
+        console.print(f"Expenses: {format_money(draft.expenses_subtotal, currency)}")
     console.print(f"Subtotal: {format_money(draft.subtotal, currency)}")
     if draft.tax:
         console.print(f"Tax: {format_money(draft.tax, currency)}")
@@ -147,7 +181,10 @@ async def create(
     period: Annotated[
         str | None,
         Parameter(
-            help="Period spec: 'last month', 'this month', YYYY-MM, or YYYY-MM-DD to YYYY-MM-DD"
+            help=(
+                "Period spec: 'last month', 'this week', 'last two weeks', "
+                "'june 16 to june 30', YYYY-MM, or YYYY-MM-DD to YYYY-MM-DD"
+            )
         ),
     ] = None,
     date_from: Annotated[str | None, Parameter(name="--from")] = None,
@@ -155,6 +192,7 @@ async def create(
     number: Annotated[str | None, Parameter(help="Override the number")] = None,
     pdf: Annotated[bool, Parameter(help="Render a PDF")] = False,
     md: Annotated[bool, Parameter(help="Render Markdown")] = False,
+    receipts: Annotated[bool, Parameter(help="Append expense receipts to the PDF")] = False,
     out: Annotated[Path | None, Parameter(help="Output directory")] = None,
     dry_run: Annotated[bool, Parameter(help="Preview, change nothing")] = False,
     interactive: Annotated[
@@ -186,7 +224,10 @@ async def create(
         return
     assert view is not None
     success(f"Created invoice [accent]{view.invoice.number}[/accent]")
-    _render_files(view, pdf, md, out)
+    receipts_on = receipts or settings.invoice.attach_receipts
+    has_r = await svc.invoice_has_receipts(view)
+    pdf, md = _resolve_formats(pdf=pdf, md=md, receipts=receipts_on, has_receipts=has_r)
+    await _render_files(view, pdf=pdf, md=md, receipts=receipts_on, out=out)
 
 
 @app.command(name="list")
@@ -276,13 +317,16 @@ async def render(
     *,
     pdf: bool = False,
     md: bool = False,
+    receipts: Annotated[bool, Parameter(help="Append expense receipts to the PDF")] = False,
     out: Path | None = None,
 ) -> None:
     """(Re)render an invoice's PDF/Markdown files."""
-    if not pdf and not md:
-        pdf = md = True
     view = await svc.get_invoice(number)
-    _render_files(view, pdf, md, out)
+    settings = get_settings()
+    receipts_on = receipts or settings.invoice.attach_receipts
+    has_r = await svc.invoice_has_receipts(view)
+    pdf, md = _resolve_formats(pdf=pdf, md=md, receipts=receipts_on, has_receipts=has_r)
+    await _render_files(view, pdf=pdf, md=md, receipts=receipts_on, out=out)
 
 
 def _print_refresh_diff(preview: svc.RefreshPreview) -> None:
@@ -317,6 +361,11 @@ def _print_refresh_diff(preview: svc.RefreshPreview) -> None:
     total_after = format_money(preview.after_total, currency)
     if preview.totals_changed:
         console.print(f"Subtotal: {sub} → [bold]{sub_after}[/bold]")
+        if preview.before_expenses_subtotal != preview.after_expenses_subtotal:
+            console.print(
+                f"Expenses: {format_money(preview.before_expenses_subtotal, currency)} → "
+                f"[bold]{format_money(preview.after_expenses_subtotal, currency)}[/bold]"
+            )
         if preview.before_tax or preview.after_tax:
             console.print(
                 f"Tax: {format_money(preview.before_tax, currency)} → "
