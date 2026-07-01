@@ -405,7 +405,8 @@ async def _write_selected_formats(
     if choice["pdf"]:
         decoded = await load_invoice_receipts(view.expense_lines) if choice["receipts"] else None
         render_pdf(view, settings, stem.with_suffix(".pdf"), receipts=decoded)
-        wrote.append(f"{stem.name}.pdf")
+        n = len(decoded) if decoded else 0
+        wrote.append(f"{stem.name}.pdf" + (f" (+{n} receipt{'s' if n != 1 else ''})" if n else ""))
     if choice["md"]:
         write_markdown(view, settings, stem.with_suffix(".md"))
         wrote.append(f"{stem.name}.md")

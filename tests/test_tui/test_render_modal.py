@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 
 from textual.app import App
-from textual.widgets import Switch
+from textual.widgets import Static, Switch
 
 from ttd.config.schema import InvoiceConfig, Settings
 
@@ -93,7 +93,29 @@ async def test_write_selected_formats_pdf_with_receipts(db, tmp_path):
         view, settings, {"pdf": True, "md": False, "receipts": True}
     )
     assert len(PdfReader(str(base_pdf)).pages) > base_pages  # receipts appended
-    assert any(name.endswith(".pdf") for name in with_r)
+    assert any(".pdf" in name for name in with_r)
+
+
+async def test_render_modal_no_format_selected():
+    from ttd.tui.screens.invoices import RenderFormatModal
+
+    modal = RenderFormatModal(has_receipts=False)
+    app = ModalHostApp(modal)
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, RenderFormatModal)
+        # turn both switches off
+        modal.query_one("#pdf", Switch).value = False
+        modal.query_one("#md", Switch).value = False
+        await pilot.pause()
+        # click render button
+        await pilot.click("#render")
+        await pilot.pause()
+        # modal should still be displayed (not dismissed)
+        assert isinstance(app.screen, RenderFormatModal)
+        # error message should be non-empty
+        error_widget = modal.query_one("#render-error", Static)
+        assert error_widget.content
 
 
 async def test_write_selected_formats_markdown(db, tmp_path):

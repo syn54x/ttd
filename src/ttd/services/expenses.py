@@ -11,7 +11,7 @@ from uuid import uuid4
 from ttd.core.errors import ConflictError, InvoicedExpenseError, NotFoundError, TtdError
 from ttd.services.projects import get_project
 from ttd.storage.db import in_db_session
-from ttd.storage.models import Client, Expense, ExpenseReceipt, Project, pk
+from ttd.storage.models import Client, Expense, ExpenseReceipt, InvoiceExpenseLine, Project, pk
 
 
 @dataclass
@@ -224,7 +224,9 @@ async def remove_receipt(uid_prefix: str) -> None:
 
 
 @in_db_session
-async def load_invoice_receipts(expense_lines) -> list[tuple[str, str, bytes]]:
+async def load_invoice_receipts(
+    expense_lines: list[InvoiceExpenseLine],
+) -> list[tuple[str, str, bytes]]:
     """Decoded (filename, content_type, bytes) receipts for an invoice's expense
     lines, in line order; expense lines without a receipt are skipped."""
     out: list[tuple[str, str, bytes]] = []
