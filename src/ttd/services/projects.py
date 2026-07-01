@@ -7,9 +7,11 @@ from uuid import uuid4
 from ttd.core.errors import ConflictError, NotFoundError
 from ttd.core.slugs import slugify
 from ttd.services.clients import get_client
+from ttd.storage.db import in_db_session
 from ttd.storage.models import Client, Entry, Project, pk
 
 
+@in_db_session
 async def create_project(
     name: str,
     client_slug: str,
@@ -64,6 +66,7 @@ async def get_project(slug: str, client_slug: str | None = None) -> Project:
     return matches[0]
 
 
+@in_db_session
 async def list_projects(
     client_slug: str | None = None, include_archived: bool = False
 ) -> list[Project]:
@@ -77,6 +80,7 @@ async def list_projects(
     return sorted(projects, key=lambda p: p.name.lower())
 
 
+@in_db_session
 async def update_project(
     slug: str,
     client_slug: str | None = None,
@@ -102,6 +106,7 @@ async def update_project(
     return project
 
 
+@in_db_session
 async def archive_project(slug: str, client_slug: str | None = None) -> Project:
     project = await get_project(slug, client_slug)
     project.archived_at = datetime.now()
@@ -110,6 +115,7 @@ async def archive_project(slug: str, client_slug: str | None = None) -> Project:
     return project
 
 
+@in_db_session
 async def delete_project(slug: str, client_slug: str | None = None, force: bool = False) -> None:
     """Delete a project. Refuses if entries exist unless force; never deletes invoiced work."""
     project = await get_project(slug, client_slug)
@@ -129,6 +135,7 @@ async def delete_project(slug: str, client_slug: str | None = None, force: bool 
     await project.delete()
 
 
+@in_db_session
 async def effective_rate(project: Project) -> Decimal | None:
     """Project rate, falling back to the client default."""
     if project.hourly_rate is not None:
@@ -137,6 +144,7 @@ async def effective_rate(project: Project) -> Decimal | None:
     return client.hourly_rate if client else None
 
 
+@in_db_session
 async def entry_seconds(project: Project, uninvoiced_only: bool = False) -> int:
     entries = await Entry.where(lambda e: e.project_id == project.id).all()
     if uninvoiced_only:

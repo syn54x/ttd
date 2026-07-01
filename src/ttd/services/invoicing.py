@@ -13,13 +13,17 @@ from ttd.core.money import to_cents
 from ttd.core.rollup import EntryFacts, rollup_days
 from ttd.core.taxes import compute_set_aside
 from ttd.invoicing.numbering import next_number
-from ttd.reporting.periods import Period
+from ttd.reporting.periods import Period, range_period
 from ttd.services.clients import get_client
 from ttd.services.projects import effective_rate
+from ttd.storage.db import in_db_session
 from ttd.storage.models import (
     Client,
     Entry,
+    Expense,
+    ExpenseReceipt,
     Invoice,
+    InvoiceExpenseLine,
     InvoiceLine,
     InvoiceStatus,
     Project,
@@ -71,11 +75,21 @@ class DraftLine:
 
 
 @dataclass
+class DraftExpenseLine:
+    expense: Expense
+    incurred_date: date
+    description: str
+    amount: Decimal
+
+
+@dataclass
 class Draft:
     client: Client
     period: Period
     lines: list[DraftLine]
+    expense_lines: list[DraftExpenseLine]
     subtotal: Decimal
+    expenses_subtotal: Decimal
     tax: Decimal
     total: Decimal
     number: str | None = None  # set when persisted
@@ -86,6 +100,7 @@ class InvoiceView:
     invoice: Invoice
     client: Client
     lines: list[InvoiceLine]
+    expense_lines: list[InvoiceExpenseLine]
     project_names: dict
 
 
@@ -110,6 +125,9 @@ class RefreshPreview:
     after_tax: Decimal
     before_total: Decimal
     after_total: Decimal
+    before_expenses_subtotal: Decimal
+    after_expenses_subtotal: Decimal
+    after_expense_lines: list[DraftExpenseLine]
     totals_changed: bool
     billing_fields_changed: bool
     has_changes: bool
@@ -121,10 +139,23 @@ def _line_key(project_id: UUID, work_date: date) -> tuple[UUID, date]:
     return (project_id, work_date)
 
 
-def _draft_totals(lines: list[DraftLine], tax_rate: Decimal) -> tuple[Decimal, Decimal, Decimal]:
+def _draft_totals(
+    lines: list[DraftLine], expense_lines: list["DraftExpenseLine"], tax_rate: Decimal
+) -> tuple[Decimal, Decimal, Decimal, Decimal]:
     subtotal = sum((line.amount for line in lines), Decimal("0"))
-    tax = to_cents(subtotal * tax_rate)
-    return subtotal, tax, subtotal + tax
+    expenses_subtotal = sum((e.amount for e in expense_lines), Decimal("0"))
+    tax = to_cents(subtotal * tax_rate)  # time only — expenses are untaxed
+    total = subtotal + tax + expenses_subtotal
+    return subtotal, expenses_subtotal, tax, total
+
+
+def _derive_period(
+    lines: list[DraftLine], expense_lines: list[DraftExpenseLine], fallback: Period
+) -> Period:
+    dates = [li.work_date for li in lines] + [el.incurred_date for el in expense_lines]
+    if not dates:
+        return fallback
+    return range_period(min(dates), max(dates))
 
 
 def _line_changed(before: InvoiceLine | None, after: DraftLine) -> frozenset[str]:
@@ -190,6 +221,7 @@ async def _build_lines_from_entries(
     return lines
 
 
+@in_db_session
 async def build_draft(client_slug: str, period: Period, settings: Settings) -> Draft:
     client = await get_client(client_slug)
     projects = {pk(p): p for p in await Project.where(lambda p: p.client_id == client.id).all()}
@@ -204,21 +236,40 @@ async def build_draft(client_slug: str, period: Period, settings: Settings) -> D
         and e.billable
         and period.start <= e.work_date <= period.end
     ]
-    if not entries:
-        raise TtdError(f"No uninvoiced billable entries for '{client_slug}' in {period.label}")
+    expenses = [
+        e
+        for e in await Expense.all()
+        if e.project_id in projects
+        and e.invoice_id is None
+        and period.start <= e.incurred_date <= period.end
+    ]
+    if not entries and not expenses:
+        raise TtdError(
+            f"No uninvoiced billable entries or expenses for '{client_slug}' in {period.label}"
+        )
 
     lines = await _build_lines_from_entries(entries, client, projects, settings)
-    subtotal, tax, total = _draft_totals(lines, settings.invoice.tax_rate)
+    expense_lines = [
+        DraftExpenseLine(e, e.incurred_date, e.description, e.amount)
+        for e in sorted(expenses, key=lambda e: (e.incurred_date, e.created_at))
+    ]
+    subtotal, expenses_subtotal, tax, total = _draft_totals(
+        lines, expense_lines, settings.invoice.tax_rate
+    )
+    actual_period = _derive_period(lines, expense_lines, fallback=period)
     return Draft(
         client=client,
-        period=period,
+        period=actual_period,  # derives from billed items; requested window is only a sieve
         lines=lines,
+        expense_lines=expense_lines,
         subtotal=subtotal,
+        expenses_subtotal=expenses_subtotal,
         tax=tax,
         total=total,
     )
 
 
+@in_db_session
 async def persist_draft(
     draft: Draft, settings: Settings, *, number: str | None = None, now: datetime | None = None
 ) -> Invoice:
@@ -241,6 +292,7 @@ async def persist_draft(
         subtotal=draft.subtotal,
         tax_rate=settings.invoice.tax_rate,
         tax=draft.tax,
+        expenses_subtotal=draft.expenses_subtotal,
         total=draft.total,
         status=InvoiceStatus.DRAFT,
         created_at=now,
@@ -263,10 +315,24 @@ async def persist_draft(
                 if entry is not None:
                     entry.invoice_id = invoice.id
                     await entry.save()
+        for eline in draft.expense_lines:
+            await InvoiceExpenseLine(
+                id=uuid4(),
+                invoice_id=pk(invoice),
+                expense_id=pk(eline.expense),
+                incurred_date=eline.incurred_date,
+                description=eline.description,
+                amount=eline.amount,
+            ).save()
+            expense = await Expense.get_or_none(pk(eline.expense))
+            if expense is not None:
+                expense.invoice_id = invoice.id
+                await expense.save()
     draft.number = final_number
     return invoice
 
 
+@in_db_session
 async def get_invoice(number: str) -> InvoiceView:
     invoice = await Invoice.where(lambda i: i.number == number).first()
     if invoice is None:
@@ -275,10 +341,13 @@ async def get_invoice(number: str) -> InvoiceView:
     assert client is not None
     lines = await InvoiceLine.where(lambda li: li.invoice_id == invoice.id).all()
     lines.sort(key=lambda li: (li.work_date, li.description))
+    expense_lines = await InvoiceExpenseLine.where(lambda li: li.invoice_id == invoice.id).all()
+    expense_lines.sort(key=lambda li: (li.incurred_date, li.description))
     names = {pk(p): p.name for p in await Project.all()}
-    return InvoiceView(invoice, client, lines, names)
+    return InvoiceView(invoice, client, lines, expense_lines, names)
 
 
+@in_db_session
 async def list_invoices() -> list[tuple[Invoice, Client]]:
     invoices = await Invoice.all()
     clients = {c.id: c for c in await Client.all()}
@@ -292,6 +361,7 @@ async def list_invoices() -> list[tuple[Invoice, Client]]:
 VALID_MARKS = ("sent", "paid", "void")
 
 
+@in_db_session
 async def mark_invoice(
     number: str,
     status: str,
@@ -313,6 +383,9 @@ async def mark_invoice(
             for entry in await Entry.where(lambda e: e.invoice_id == invoice.id).all():
                 entry.invoice_id = None
                 await entry.save()
+            for expense in await Expense.where(lambda e: e.invoice_id == invoice.id).all():
+                expense.invoice_id = None
+                await expense.save()
             invoice.status = InvoiceStatus.VOID
             _clear_paid_snapshot(invoice)
             await invoice.save()
@@ -336,6 +409,7 @@ def _clear_paid_snapshot(invoice: Invoice) -> None:
     invoice.set_aside = None
 
 
+@in_db_session
 async def preview_refresh(number: str, settings: Settings) -> RefreshPreview:
     view = await get_invoice(number)
     invoice, client = view.invoice, view.client
@@ -344,8 +418,8 @@ async def preview_refresh(number: str, settings: Settings) -> RefreshPreview:
         raise ConflictError(f"Invoice {number} is void and can't be refreshed")
 
     entries = await Entry.where(lambda e: e.invoice_id == invoice.id).all()
-    if not entries:
-        raise TtdError(f"Invoice {number} has no linked entries")
+    if not entries and not view.lines and not view.expense_lines:
+        raise TtdError(f"Invoice {number} has no linked entries or expenses")
 
     project_ids = {e.project_id for e in entries}
     projects = {pk(p): p for p in await Project.all() if pk(p) in project_ids}
@@ -405,10 +479,22 @@ async def preview_refresh(number: str, settings: Settings) -> RefreshPreview:
     before_subtotal = invoice.subtotal
     before_tax = invoice.tax
     before_total = invoice.total
-    after_subtotal, after_tax, after_total = _draft_totals(after_lines, settings.invoice.tax_rate)
+    before_expenses_subtotal = invoice.expenses_subtotal
+
+    linked_expenses = await Expense.where(lambda e: e.invoice_id == invoice.id).all()
+    after_expense_lines = [
+        DraftExpenseLine(e, e.incurred_date, e.description, e.amount)
+        for e in sorted(linked_expenses, key=lambda e: (e.incurred_date, e.created_at))
+    ]
+    after_subtotal, after_expenses, after_tax, after_total = _draft_totals(
+        after_lines, after_expense_lines, settings.invoice.tax_rate
+    )
 
     totals_changed = (
-        before_subtotal != after_subtotal or before_tax != after_tax or before_total != after_total
+        before_subtotal != after_subtotal
+        or before_tax != after_tax
+        or before_total != after_total
+        or invoice.expenses_subtotal != after_expenses
     )
     has_changes = any(d.changed for d in diffs) or totals_changed
 
@@ -430,6 +516,9 @@ async def preview_refresh(number: str, settings: Settings) -> RefreshPreview:
         after_tax=after_tax,
         before_total=before_total,
         after_total=after_total,
+        before_expenses_subtotal=before_expenses_subtotal,
+        after_expenses_subtotal=after_expenses,
+        after_expense_lines=after_expense_lines,
         totals_changed=totals_changed,
         billing_fields_changed=billing_fields_changed,
         has_changes=has_changes,
@@ -438,6 +527,7 @@ async def preview_refresh(number: str, settings: Settings) -> RefreshPreview:
     )
 
 
+@in_db_session
 async def apply_refresh(number: str, preview: RefreshPreview, settings: Settings) -> Invoice:
     status = enum_value(preview.invoice.status)
     if status == "void":
@@ -506,6 +596,30 @@ async def apply_refresh(number: str, preview: RefreshPreview, settings: Settings
                 if key not in seen_keys:
                     await line.delete()
 
+            for stale in await InvoiceExpenseLine.where(
+                lambda li: li.invoice_id == invoice.id
+            ).all():
+                await stale.delete()
+            for eline in fresh.after_expense_lines:
+                await InvoiceExpenseLine(
+                    id=uuid4(),
+                    invoice_id=pk(invoice),
+                    expense_id=pk(eline.expense),
+                    incurred_date=eline.incurred_date,
+                    description=eline.description,
+                    amount=eline.amount,
+                ).save()
+            time_rows = await InvoiceLine.where(lambda li: li.invoice_id == invoice.id).all()
+            exp_rows = await InvoiceExpenseLine.where(lambda li: li.invoice_id == invoice.id).all()
+            billed_dates = [li.work_date for li in time_rows] + [
+                li.incurred_date for li in exp_rows
+            ]
+            # re-derive the period from the surviving billed rows
+            if billed_dates:
+                invoice.period_start = min(billed_dates)
+                invoice.period_end = max(billed_dates)
+            invoice.expenses_subtotal = fresh.after_expenses_subtotal
+
             invoice.subtotal = fresh.after_subtotal
             invoice.tax_rate = settings.invoice.tax_rate
             invoice.tax = fresh.after_tax
@@ -515,3 +629,13 @@ async def apply_refresh(number: str, preview: RefreshPreview, settings: Settings
     updated = await Invoice.where(lambda i: i.number == number).first()
     assert updated is not None
     return updated
+
+
+@in_db_session
+async def invoice_has_receipts(view: InvoiceView) -> bool:
+    """True if any of the invoice's linked expenses has a stored receipt."""
+    if not view.expense_lines:
+        return False
+    expense_ids = {li.expense_id for li in view.expense_lines}
+    receipts = await ExpenseReceipt.all()
+    return any(r.expense_id in expense_ids for r in receipts)

@@ -23,6 +23,7 @@ class Invoice(Model):
     subtotal: Decimal
     tax_rate: Decimal = Decimal("0")
     tax: Decimal = Decimal("0")
+    expenses_subtotal: Decimal = Decimal("0")  # untaxed pass-through expenses
     total: Decimal
     status: Annotated[InvoiceStatus, FerroField(db_type="text")] = InvoiceStatus.DRAFT
     notes: str = ""
@@ -45,3 +46,14 @@ class InvoiceLine(Model):
     rate: Decimal
     amount: Decimal
     description: str = ""
+
+
+class InvoiceExpenseLine(Model):
+    """One expense frozen onto an invoice; ``amount`` is frozen at invoice time."""
+
+    id: Annotated[UUID | None, FerroField(primary_key=True)] = None
+    invoice_id: Annotated[UUID, FerroField(index=True)]
+    expense_id: Annotated[UUID, FerroField(index=True)]
+    incurred_date: Annotated[date, FerroField(db_type="date")]
+    description: str
+    amount: Decimal

@@ -482,17 +482,17 @@ wheels = [
 
 [[package]]
 name = "ferro-orm"
-version = "0.10.5"
+version = "0.12.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9e/b2/990df431bd95fc6f776c2e22fafb3bb7b5bf934312fd16fd3e5ca2b62db7/ferro_orm-0.10.5.tar.gz", hash = "sha256:af754e1b31c4595ee74da98319f850c1f6a9b9fc8895952b6e333501e4840d13", size = 472485, upload-time = "2026-05-25T17:30:25.678Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/88/a245a6d2718afbe4e17186090433eb8d5414d1b0c41a57920c4398e8e5a5/ferro_orm-0.12.3.tar.gz", hash = "sha256:5505e315b8fcc444b704b0c42e5fc4f80adb47028e6acfca7c525e90cdf557b8", size = 548721, upload-time = "2026-06-24T00:38:48.948Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e9/8a/94e02abbad3216daba6363c184c700353569d4a90e9ce303d87ed0954112/ferro_orm-0.10.5-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:66e9c8b7ed4eeb08b7b4fdfe233a2edb1a87c5d1824c53228b9f1fa42d7c3ce0", size = 4484540, upload-time = "2026-05-25T17:30:17.657Z" },
-    { url = "https://files.pythonhosted.org/packages/9e/5b/c25a15974442fe232b1320b3215bd7c302de6d7104a79bdd5e2982e86026/ferro_orm-0.10.5-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:fefe3b6df656023af1419a4106b9123e156b803b4680dcda75696062881b8ecd", size = 4832148, upload-time = "2026-05-25T17:30:19.768Z" },
-    { url = "https://files.pythonhosted.org/packages/1c/b2/90ab18cd4e74fdfb9e7fa9cdfb2ff277c5f5996c418b4850e6e86902409b/ferro_orm-0.10.5-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4082e781f13537354cda8b5097521dee1274b7c3b8cbc7ca6232962a6eded9d6", size = 4961140, upload-time = "2026-05-25T17:30:21.879Z" },
-    { url = "https://files.pythonhosted.org/packages/0a/03/a63ec192cec120ff489ca9e9b1633dd870675de4629396ffad785d87c6b7/ferro_orm-0.10.5-cp39-abi3-win_amd64.whl", hash = "sha256:deb0eadb1d458e1b2ae8281e665610a68457c83f2de89e9c8af6eaaa82e2976d", size = 4372439, upload-time = "2026-05-25T17:30:23.814Z" },
+    { url = "https://files.pythonhosted.org/packages/0e/1d/599f0ab293c72fce06dcecdaaac8c77222541767b184aaecb9e0fa5e4721/ferro_orm-0.12.3-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:ca7f0b827f4d2157354ea367bbc019c04aff53df8dcaa7829f52977e032d1b93", size = 4701678, upload-time = "2026-06-24T00:38:41.366Z" },
+    { url = "https://files.pythonhosted.org/packages/e9/a6/a6ab5509803419998f1c7bc3dee740be926e3a108fe831bd6a0e65b7c649/ferro_orm-0.12.3-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:f93dfff5187a5b7e379fffd74fac4c17da0663b28b1c3f5477b39c65336febb4", size = 5062162, upload-time = "2026-06-24T00:38:44.018Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/93/1de5f7ffae165905e9472157551685e37905cb0386190f372e34f8bd538e/ferro_orm-0.12.3-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6bfd9db1bb8ad1dd6f703596b59ca24cf3b744fe4b6090f20e8c5a5232de937b", size = 5201389, upload-time = "2026-06-24T00:38:45.81Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/66/9b436821b86c160f04db0c9fe9fa90e833c8643df532da1aa45d527e4b97/ferro_orm-0.12.3-cp39-abi3-win_amd64.whl", hash = "sha256:51e49dbbea6aa31ef69ebb903650331a62fc2343eb6567f274d338d3f3dbd092", size = 4633120, upload-time = "2026-06-24T00:38:47.408Z" },
 ]
 
 [package.optional-dependencies]
@@ -1432,6 +1432,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pypdf"
+version = "6.14.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/03/72/7dfd5ff1c9c37de97a731701f51af091325f123d9d4270361c9c69e4431f/pypdf-6.14.2.tar.gz", hash = "sha256:7873f502fe4385e79539b21d872392dc0c4e3714327c15881cbc7fbfd1f95b25", size = 6491182, upload-time = "2026-06-23T14:18:30.859Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/49/e6/136aa8993a2ae7214e0b0ef2edaa0d2e08d1d4e4982635b08a835ff31ec8/pypdf-6.14.2-py3-none-any.whl", hash = "sha256:3f07891af76dc002657e04993ab9b4de81de29f9013b9761d0b7968bff12e946", size = 349514, upload-time = "2026-06-23T14:18:28.867Z" },
+]
+
+[[package]]
 name = "pytest"
 version = "8.4.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1844,6 +1853,7 @@ dependencies = [
     { name = "openpyxl" },
     { name = "platformdirs" },
     { name = "pydantic" },
+    { name = "pypdf" },
     { name = "questionary" },
     { name = "rich" },
     { name = "textual" },
@@ -1870,13 +1880,14 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "cyclopts", specifier = ">=4.17" },
-    { name = "ferro-orm", extras = ["alembic"], specifier = ">=0.10.5" },
+    { name = "ferro-orm", extras = ["alembic"], specifier = ">=0.12.3,<0.13" },
     { name = "fpdf2", specifier = ">=2.8" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "numbers-parser", specifier = ">=4.18" },
     { name = "openpyxl", specifier = ">=3.1" },
     { name = "platformdirs", specifier = ">=4" },
     { name = "pydantic", specifier = ">=2.7" },
+    { name = "pypdf", specifier = ">=6.14.2" },
     { name = "questionary", specifier = ">=2.0" },
     { name = "rich", specifier = ">=14" },
     { name = "textual", specifier = ">=3.0" },

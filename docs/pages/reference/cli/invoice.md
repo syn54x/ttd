@@ -31,12 +31,13 @@ Invoice a client's uninvoiced billable work (defaults to last month).
 
 * `--client`: Client slug
 * `--month`: YYYY-MM
-* `--period`: Period spec: 'last month', 'this month', YYYY-MM, or YYYY-MM-DD to YYYY-MM-DD
+* `--period`: Period spec: 'last month', 'this week', 'last two weeks', 'june 16 to june 30', YYYY-MM, or YYYY-MM-DD to YYYY-MM-DD
 * `--from`:
 * `--to`:
 * `--number`: Override the number
 * `--pdf, --no-pdf`: Render a PDF  *\[default: False\]*
 * `--md, --no-md`: Render Markdown  *\[default: False\]*
+* `--receipts, --no-receipts`: Append expense receipts to the PDF  *\[default: False\]*
 * `--out`: Output directory
 * `--dry-run, --no-dry-run`: Preview, change nothing  *\[default: False\]*
 * `--interactive, --no-interactive, -i`: Fill remaining fields via a form  *\[default: False\]*
@@ -75,6 +76,7 @@ ttd invoice render [OPTIONS] NUMBER
 * `NUMBER, --number`:   **\[required\]**
 * `--pdf, --no-pdf`:   *\[default: False\]*
 * `--md, --no-md`:   *\[default: False\]*
+* `--receipts, --no-receipts`: Append expense receipts to the PDF  *\[default: False\]*
 * `--out`:
 
 ## invoice refresh

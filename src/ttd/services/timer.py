@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from ttd.core.errors import ConflictError, TtdError
 from ttd.services.projects import get_project
+from ttd.storage.db import in_db_session
 from ttd.storage.models import (
     TIMER_SINGLETON_ID,
     Client,
@@ -26,6 +27,7 @@ class TimerStatus:
     today_seconds: int
 
 
+@in_db_session
 async def start_timer(
     project_slug: str,
     client_slug: str | None = None,
@@ -50,6 +52,7 @@ async def start_timer(
     return timer
 
 
+@in_db_session
 async def stop_timer(
     *,
     now: datetime,
@@ -84,6 +87,7 @@ async def stop_timer(
     return entry
 
 
+@in_db_session
 async def cancel_timer() -> TimerState:
     timer = await TimerState.get_or_none(TIMER_SINGLETON_ID)
     if timer is None:
@@ -92,6 +96,7 @@ async def cancel_timer() -> TimerState:
     return timer
 
 
+@in_db_session
 async def timer_status(*, now: datetime) -> TimerStatus:
     timer = await TimerState.get_or_none(TIMER_SINGLETON_ID)
     today = now.date()

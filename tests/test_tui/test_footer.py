@@ -1,9 +1,9 @@
 """AdaptiveFooter: every binding stays visible at any terminal width."""
 
 import pytest
+from _db import open_test_db
 
 from ttd.config.schema import Settings, StorageConfig
-from ttd.storage.db import close_db, init_db
 from ttd.tui.app import TtdApp
 
 
@@ -13,11 +13,9 @@ async def app(tmp_path, monkeypatch):
     db_path = tmp_path / "tui.db"
     monkeypatch.setenv("TTD_DB_PATH", str(db_path))
     monkeypatch.setenv("TTD_CONFIG_DIR", str(tmp_path / "config"))
-    await close_db()
-    await init_db(Settings(storage=StorageConfig(db_path=db_path)))
-    await close_db()
+    async with open_test_db(Settings(storage=StorageConfig(db_path=db_path))):
+        pass
     yield TtdApp()
-    await close_db()
 
 
 def _hidden_keys(footer) -> list:
@@ -30,7 +28,7 @@ def _hidden_keys(footer) -> list:
 
 async def test_footer_wraps_instead_of_clipping_when_narrow(app):
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.press("2")  # timesheet has the most bindings
+        await pilot.press("2")  # log has the most bindings
         await pilot.pause()
         await pilot.pause()
         footer = app.screen.query_one("AdaptiveFooter")
@@ -82,7 +80,7 @@ async def test_wrapped_second_row_keys_still_dispatch_actions(app):
         await pilot.pause()
         await pilot.pause()
         footer = app.screen.query_one("AdaptiveFooter")
-        target = next(k for k in footer.query("FooterKey") if k.description == "today")
+        target = next(k for k in footer.query("FooterKey") if k.description == "this month")
         assert target.region.y > footer.region.y  # really on a wrapped row
         await pilot.click(target)
         await pilot.pause()
