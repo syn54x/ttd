@@ -101,13 +101,9 @@ async def _render_files(
     if pdf:
         decoded = None
         if receipts:
-            from ttd.services import expenses as expense_svc
+            from ttd.services.expenses import load_invoice_receipts
 
-            decoded = []
-            for line in view.expense_lines:
-                got = await expense_svc.get_receipt(str(line.expense_id)[:8])
-                if got is not None:
-                    decoded.append(got)
+            decoded = await load_invoice_receipts(view.expense_lines)
         path = render_pdf(view, settings, stem.with_suffix(".pdf"), receipts=decoded)
         success(f"Wrote {path}")
     if md:

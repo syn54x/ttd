@@ -221,3 +221,15 @@ async def remove_receipt(uid_prefix: str) -> None:
     expense = await find_expense(uid_prefix)
     for receipt in await ExpenseReceipt.where(lambda r: r.expense_id == expense.id).all():
         await receipt.delete()
+
+
+@in_db_session
+async def load_invoice_receipts(expense_lines) -> list[tuple[str, str, bytes]]:
+    """Decoded (filename, content_type, bytes) receipts for an invoice's expense
+    lines, in line order; expense lines without a receipt are skipped."""
+    out: list[tuple[str, str, bytes]] = []
+    for line in expense_lines:
+        got = await get_receipt(str(line.expense_id)[:8])
+        if got is not None:
+            out.append(got)
+    return out
