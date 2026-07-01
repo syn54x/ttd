@@ -1,14 +1,17 @@
 """Invoices: list with status pills, detail view, create wizard, render, mark paid."""
 
 from datetime import datetime
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
+
+if TYPE_CHECKING:
+    from ttd.config.schema import Settings
 
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, DataTable, Input, Label, Markdown, Static
+from textual.widgets import Button, DataTable, Input, Label, Markdown, Static, Switch
 
 from ttd.config.loader import get_settings
 from ttd.core.errors import TtdError
@@ -339,6 +342,76 @@ class InvoiceRefreshModal(ModalScreen["svc.RefreshPreview | None"]):
             self.dismiss(self.preview)
 
 
+class RenderFormatModal(ModalScreen[dict | None]):
+    """Choose which files to render. Receipts embed into the PDF and are only
+    available when the invoice has receipts; enabling them locks out Markdown."""
+
+    BINDINGS: ClassVar = [("escape", "dismiss(None)", "cancel")]
+
+    def __init__(self, has_receipts: bool) -> None:
+        super().__init__()
+        self.has_receipts = has_receipts
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal-box"):
+            yield Label("render invoice", classes="modal-title")
+            with Horizontal(classes="form-toggle-row"):
+                yield Switch(value=True, id="pdf")
+                yield Label("PDF", classes="field-label")
+            with Horizontal(classes="form-toggle-row"):
+                yield Switch(value=False, id="md", disabled=self.has_receipts)
+                yield Label("Markdown", classes="field-label")
+            with Horizontal(classes="form-toggle-row"):
+                yield Switch(value=self.has_receipts, id="receipts", disabled=not self.has_receipts)
+                yield Label("Include receipts", classes="field-label")
+            yield Static("", id="render-error", classes="form-error")
+            with Horizontal(classes="modal-buttons"):
+                yield Button("Render", variant="primary", id="render")
+                yield Button("Cancel", id="cancel")
+
+    @on(Switch.Changed, "#receipts")
+    def _receipts_changed(self, event: Switch.Changed) -> None:
+        md = self.query_one("#md", Switch)
+        if event.value:
+            self.query_one("#pdf", Switch).value = True
+            md.value = False
+            md.disabled = True
+        else:
+            md.disabled = False
+
+    @on(Button.Pressed, "#render")
+    def _do_render(self) -> None:
+        pdf = self.query_one("#pdf", Switch).value
+        md = self.query_one("#md", Switch).value
+        receipts = self.query_one("#receipts", Switch).value
+        if not pdf and not md:
+            self.query_one("#render-error", Static).update("[red]Choose at least one format[/red]")
+            return
+        self.dismiss({"pdf": pdf, "md": md, "receipts": receipts})
+
+    @on(Button.Pressed, "#cancel")
+    def _cancel(self) -> None:
+        self.dismiss(None)
+
+
+async def _write_selected_formats(
+    view: "svc.InvoiceView", settings: "Settings", choice: dict
+) -> list[str]:
+    """Render the chosen formats; return the file names (with extension) written."""
+    from ttd.services.expenses import load_invoice_receipts
+
+    stem = settings.invoice.output_dir / f"{view.invoice.number}-{view.client.slug}"
+    wrote: list[str] = []
+    if choice["pdf"]:
+        decoded = await load_invoice_receipts(view.expense_lines) if choice["receipts"] else None
+        render_pdf(view, settings, stem.with_suffix(".pdf"), receipts=decoded)
+        wrote.append(f"{stem.name}.pdf")
+    if choice["md"]:
+        write_markdown(view, settings, stem.with_suffix(".md"))
+        wrote.append(f"{stem.name}.md")
+    return wrote
+
+
 class InvoicesScreen(TtdScreen):
     nav_id = "invoices"
 
@@ -347,7 +420,7 @@ class InvoicesScreen(TtdScreen):
         ("n", "new_invoice", "new"),
         Binding("o", "open_detail", "open"),
         ("m", "preview_markdown", "preview md"),
-        ("e", "render_files", "render pdf+md"),
+        ("e", "render_files", "render"),
         ("u", "refresh_invoice", "update"),
         ("p", "mark('paid')", "paid"),
         ("t", "mark('sent')", "sent"),
@@ -422,10 +495,15 @@ class InvoicesScreen(TtdScreen):
             return
         settings = get_settings()
         view = await svc.get_invoice(number)
-        stem = settings.invoice.output_dir / f"{view.invoice.number}-{view.client.slug}"
-        render_pdf(view, settings, stem.with_suffix(".pdf"))
-        write_markdown(view, settings, stem.with_suffix(".md"))
-        self.notify(f"wrote {stem}.pdf + .md", title="rendered")
+        has_receipts = await svc.invoice_has_receipts(view)
+
+        async def _render(choice: dict | None) -> None:
+            if choice is None:
+                return
+            wrote = await _write_selected_formats(view, settings, choice)
+            self.notify("wrote " + ", ".join(wrote), title="rendered")
+
+        self.app.push_screen(RenderFormatModal(has_receipts), _render)
 
     async def action_refresh_invoice(self) -> None:
         number = self._selected_number()
