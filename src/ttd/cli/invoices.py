@@ -60,7 +60,9 @@ def _resolve_period(
     if period is not None:
         if month is not None or date_from is not None or date_to is not None:
             raise TtdError("Pass --period alone, not with --month or --from/--to")
-        return periods.parse_period(period, datetime.now().date())
+        return periods.parse_period(
+            period, datetime.now().date(), week_start=get_settings().display.week_start
+        )
     if month is not None:
         return periods.month_period(datetime.now().date(), ym=month)
     if date_from is not None and date_to is not None:

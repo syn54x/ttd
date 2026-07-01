@@ -164,7 +164,9 @@ class NewInvoiceModal(ModalScreen["svc.Draft | None"]):
         button.disabled = True
 
         try:
-            period = periods.parse_period(raw, datetime.now().date())
+            period = periods.parse_period(
+                raw, datetime.now().date(), week_start=get_settings().display.week_start
+            )
         except TtdError as exc:
             status.update(f"[red]✗ {exc}[/red]")
             return
