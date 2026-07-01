@@ -362,8 +362,9 @@ async def test_entry_edit_invoiced_blocked(seeded_app):
     from uuid import uuid4
 
     async with open_test_db():
-        rows = await entry_svc.list_entries()
-        # Mark the first entry in date order (row 0 in month view) as invoiced.
+        first_of_month = date.today().replace(day=1)
+        rows = await entry_svc.list_entries(date_from=first_of_month, date_to=date.today())
+        # Mark the first current-month entry (row 0 in month view) as invoiced.
         target = rows[0]
         target.entry.invoice_id = uuid4()
         await target.entry.save()

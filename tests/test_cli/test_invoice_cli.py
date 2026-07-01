@@ -104,7 +104,7 @@ def test_invoiced_entries_locked_via_cli(isolated_config):
 def test_invoice_create_with_period_spec(isolated_config):
     _seed(isolated_config)
     result = runner.invoke(
-        app, ["invoice", "create", "--client", "acme", "--period", "this month", "--dry-run"]
+        app, ["invoice", "create", "--client", "acme", "--period", "last two weeks", "--dry-run"]
     )
     assert result.exit_code == 0, result.output
     assert "Dry run" in result.output
