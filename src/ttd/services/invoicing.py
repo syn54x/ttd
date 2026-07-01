@@ -13,7 +13,7 @@ from ttd.core.money import to_cents
 from ttd.core.rollup import EntryFacts, rollup_days
 from ttd.core.taxes import compute_set_aside
 from ttd.invoicing.numbering import next_number
-from ttd.reporting.periods import Period
+from ttd.reporting.periods import Period, range_period
 from ttd.services.clients import get_client
 from ttd.services.projects import effective_rate
 from ttd.storage.db import in_db_session
@@ -149,6 +149,15 @@ def _draft_totals(
     return subtotal, expenses_subtotal, tax, total
 
 
+def _derive_period(
+    lines: list[DraftLine], expense_lines: list[DraftExpenseLine], fallback: Period
+) -> Period:
+    dates = [li.work_date for li in lines] + [el.incurred_date for el in expense_lines]
+    if not dates:
+        return fallback
+    return range_period(min(dates), max(dates))
+
+
 def _line_changed(before: InvoiceLine | None, after: DraftLine) -> frozenset[str]:
     if before is None:
         return frozenset({"description", "billed_seconds", "rate", "amount"})
@@ -247,9 +256,10 @@ async def build_draft(client_slug: str, period: Period, settings: Settings) -> D
     subtotal, expenses_subtotal, tax, total = _draft_totals(
         lines, expense_lines, settings.invoice.tax_rate
     )
+    actual_period = _derive_period(lines, expense_lines, fallback=period)
     return Draft(
         client=client,
-        period=period,
+        period=actual_period,
         lines=lines,
         expense_lines=expense_lines,
         subtotal=subtotal,
@@ -599,6 +609,14 @@ async def apply_refresh(number: str, preview: RefreshPreview, settings: Settings
                     description=eline.description,
                     amount=eline.amount,
                 ).save()
+            time_rows = await InvoiceLine.where(lambda li: li.invoice_id == invoice.id).all()
+            exp_rows = await InvoiceExpenseLine.where(lambda li: li.invoice_id == invoice.id).all()
+            billed_dates = [li.work_date for li in time_rows] + [
+                li.incurred_date for li in exp_rows
+            ]
+            if billed_dates:
+                invoice.period_start = min(billed_dates)
+                invoice.period_end = max(billed_dates)
             invoice.expenses_subtotal = fresh.after_expenses_subtotal
 
             invoice.subtotal = fresh.after_subtotal

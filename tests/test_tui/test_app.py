@@ -515,7 +515,11 @@ async def test_invoice_wizard_custom_period_with_line_preview(seeded_app):
         from ttd.services import invoicing as invoice_svc
 
         ((invoice, _client),) = await invoice_svc.list_invoices()
-        assert invoice.period_start.isoformat() == start
+        # Period derives from actual billed dates (not the requested window).
+        # Entries are seeded every 2 days from 0..12 days back; the earliest is 12 days back.
+        # The expense defaults to today.  Both collapse inward from the 14-day window.
+        derived_start = (NOW - td(days=12)).date().isoformat()
+        assert invoice.period_start.isoformat() == derived_start
         assert invoice.period_end.isoformat() == end
 
 
