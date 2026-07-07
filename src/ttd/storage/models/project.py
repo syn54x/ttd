@@ -17,6 +17,6 @@ class Project(Model):
     name: str
     slug: Annotated[str, FerroField(index=True)]
     hourly_rate: Decimal | None = None
-    archived_at: datetime | None = None
-    created_at: datetime
-    updated_at: datetime
+    archived_at: Annotated[datetime | None, FerroField(db_type="timestamp")] = None
+    created_at: Annotated[datetime, FerroField(db_type="timestamp")]
+    updated_at: Annotated[datetime, FerroField(db_type="timestamp")]

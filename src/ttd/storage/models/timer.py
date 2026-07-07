@@ -14,5 +14,5 @@ class TimerState(Model):
 
     id: Annotated[UUID | None, FerroField(primary_key=True)] = None
     project_id: Annotated[UUID, FerroField(index=True)]
-    started_at: datetime
+    started_at: Annotated[datetime, FerroField(db_type="timestamp")]
     note: str = ""

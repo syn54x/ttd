@@ -21,8 +21,8 @@ class Expense(Model):
     amount: Decimal
     note: str = ""
     invoice_id: Annotated[UUID | None, FerroField(index=True)] = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: Annotated[datetime, FerroField(db_type="timestamp")]
+    updated_at: Annotated[datetime, FerroField(db_type="timestamp")]
 
 
 class ExpenseReceipt(Model):
