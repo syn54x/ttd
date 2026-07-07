@@ -183,8 +183,10 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           gh release create "${{ needs.release.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
             --title "${{ needs.release.outputs.tag }}" \
             --notes-file release-body.md \
+            --verify-tag \
             dist/*.tar.gz dist/*.whl
 
   docs:
