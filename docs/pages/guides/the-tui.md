@@ -13,7 +13,7 @@ These work on every screen:
 | --- | --- |
 | `1` – `6` | switch screens (the nav rail shows the numbers) |
 | `s` | start a timer / stop the running one |
-| `l` | quick log — natural-language entry with live preview |
+| `l` | quick log — choose time or expense |
 | `r` | refresh |
 | `q` | quit |
 
@@ -29,13 +29,21 @@ The footer summary matches `ttd status` on the CLI (week hours and unbilled valu
 
 ![Dashboard](../assets/screenshots/dashboard.svg)
 
-## Timesheet
+## Log
 
-Screen `2`. Entries grouped by day across a day/week/month span — add, edit,
-and delete in place. Keys: `d`/`w`/`m` span, `[` `]` paging, `g` today, `a`
-add, `e` edit, `x` delete.
+Screen `2`. A month-scoped view of **time entries** and **expenses** in two
+stacked tables — browse, edit, and delete either kind. Keys: `[` `]` change
+month, `g` jump to this month, `tab` switch between sections, `e` edit, `x`
+delete the focused row.
 
-![Timesheet](../assets/screenshots/timesheet-week.svg)
+![Log](../assets/screenshots/log-month.svg)
+
+Time rows show date, project, duration, note, and flags (`nb`, `inv`). Expense
+rows show date, project, description, amount (` inv` when invoiced). An empty
+month still shows both section headers.
+
+Add new records with global `l` (time or expense). See
+[Expenses](expenses.md) for expense workflows.
 
 ## Clients
 
@@ -58,7 +66,8 @@ Screen `5`. Every invoice with its status pill; create, inspect, render, and
 advance them without leaving the screen. When `tax.set_aside_rate` is set, the
 list adds **est. tax** and **take-home** columns (dim until the invoice is
 paid), and the detail modal shows the same figures. Keys: `n` new, `o` detail,
-`u` refresh, `m` markdown preview, `e` render files, `t` sent, `p` paid, `v` void.
+`u` refresh, `m` markdown preview, `e` render (format modal), `t` sent, `p`
+paid, `v` void.
 
 ![Invoices](../assets/screenshots/invoices-list.svg)
 
@@ -71,18 +80,18 @@ Screen `6`. The quarterly set-aside dashboard. Keys: `p` record payment,
 
 ## Quick log and modals
 
-`l` opens the quick-log form anywhere: type a
-[time expression](../reference/time-expressions.md), watch the live parse
-preview confirm what will be logged, pick the project, add a note:
+`l` opens a chooser: **time** (natural-language entry with live preview) or
+**expense** (project, description, amount, date). Time logging uses the same
+[time expressions](../reference/time-expressions.md) as the CLI:
 
-![Quick log](../assets/screenshots/quicklog.svg)
+![Quick log chooser](../assets/screenshots/quicklog.svg)
 
 Forms submit with ++enter++ and cancel with ++escape++; confirmation dialogs
 accept `y`; pickers are arrow-key lists.
 
 ## Themes
 
-Press `t` anywhere in the TUI, or open the command palette (`ctrl+p`) →
+Press ++ctrl+t++ anywhere in the TUI, or open the command palette (`ctrl+p`) →
 **Theme**, to browse Textual's full theme catalog in a two-column picker:
 searchable list on the left, a miniature TUI preview on the right. Arrow keys
 update the preview live; press ++enter++ to apply or ++escape++ to cancel and

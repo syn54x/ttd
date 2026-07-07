@@ -10,27 +10,26 @@ Available on every screen:
 | Key | Action |
 | --- | --- |
 | `1` | Dashboard |
-| `2` | Timesheet |
+| `2` | Log |
 | `3` | Clients |
 | `4` | Reports |
 | `5` | Invoices |
 | `6` | Taxes |
 | `s` | Start / stop the timer |
-| `l` | Quick log |
-| `t` | Theme picker |
+| `l` | Quick log chooser (time / expense) |
+| `ctrl+t` | Theme picker |
 | `r` | Refresh |
 | `q` | Quit |
 
-## Timesheet (`2`)
+## Log (`2`)
 
 | Key | Action |
 | --- | --- |
-| `d` / `w` / `m` | Day / week / month span |
-| `[` / `]` | Previous / next period |
-| `g` | Jump to today |
-| `a` | Add entry |
-| `e` | Edit selected entry |
-| `x` | Delete selected entry |
+| `[` / `]` | Previous / next month |
+| `g` | Jump to this month |
+| `tab` | Switch focus: time table ↔ expenses table |
+| `e` | Edit selected row |
+| `x` | Delete selected row |
 
 ## Clients (`3`)
 
@@ -54,10 +53,10 @@ Available on every screen:
 | Key | Action |
 | --- | --- |
 | `n` | New invoice |
-| `o` | Open detail |
+| `o` | Open detail (time + expense lines) |
 | `u` | Refresh (recompute from locked entries) |
 | `m` | Preview Markdown |
-| `e` | Render PDF + Markdown |
+| `e` | Render format modal (receipts / PDF / Markdown) |
 | `t` | Mark sent |
 | `p` | Mark paid |
 | `v` | Mark void |

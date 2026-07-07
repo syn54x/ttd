@@ -13,8 +13,9 @@ $ ttd export ledger.numbers
 $ ttd export backup -f json      # or say it explicitly
 ```
 
-All formats write the same [canonical columns](../reference/interchange-format.md).
-The JSON export adds a `_metadata` block (export time, settings summary).
+CSV, XLSX, and Numbers write the same [canonical entry columns](../reference/interchange-format.md).
+**JSON** is the full-fidelity archive — see [JSON envelope v2](#json-envelope-v2)
+below.
 
 ### Filtering exports
 
@@ -48,7 +49,7 @@ $ ttd import ledger.csv --dry-run
 ```
 
 Shows exactly what would be created, updated, or skipped — and why — without
-touching the database.
+touching the database. Expense restore is skipped on dry-run.
 
 ### Conflicts and idempotence
 
@@ -63,8 +64,49 @@ $ ttd import ledger.csv --on-conflict duplicate   # keep both
 ```
 
 Re-importing your own export with `skip` is a no-op — imports are safe to
-repeat. **Invoiced entries are never modified or re-linked** by an import,
-whatever the conflict mode.
+repeat. **Invoiced entries and expenses are never modified or re-linked** by
+an import, whatever the conflict mode.
+
+## JSON envelope v2
+
+JSON exports use envelope version 2 (`ttd_export: 2`):
+
+```json
+{
+  "ttd_export": 2,
+  "clients": [ … ],
+  "projects": [ … ],
+  "entries": [ … ],
+  "expenses": [
+    {
+      "id": "…",
+      "client": "acme-corp",
+      "project": "api-rewrite",
+      "incurred_date": "2026-06-15",
+      "description": "Claude Code",
+      "amount": "100.00",
+      "note": "",
+      "invoice_number": ""
+    }
+  ],
+  "receipts": [
+    {
+      "expense_id": "…",
+      "filename": "receipt.pdf",
+      "content_type": "application/pdf",
+      "data_b64": "…"
+    }
+  ]
+}
+```
+
+`ttd import ledger.json` restores clients, projects, entries, **expenses**,
+and **receipts** (after entry import). Older v1 exports without an `expenses`
+key still import entries normally.
+
+Expenses do not export to CSV, XLSX, or Numbers
+([#20](https://github.com/syn54x/ttd/issues/20)). For portable archives that
+include expenses, use JSON.
 
 ## Migrating from another tracker
 

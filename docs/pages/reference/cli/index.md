@@ -28,6 +28,7 @@ Running bare `ttd` with no command launches [the TUI](../../guides/the-tui.md).
 | [`entry`](entry.md) | List and edit time entries. |
 | [`start` · `stop` · `status` · `cancel`](timer.md) | Start, inspect, stop, or discard the live timer. |
 | [`log`](log.md) | Log completed work from a natural-language time spec. |
+| [`expense`](expense.md) | Track and bill back client expenses. |
 | [`report`](report.md) | Summaries by day, week, month, or range. |
 | [`invoice`](invoice.md) | Create and manage invoices. |
 | [`tax`](tax.md) | Track tax set-aside and IRS estimated-tax payments. |

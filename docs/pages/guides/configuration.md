@@ -69,7 +69,16 @@ $ ttd config set display.time_format 24h            # 24-hour clock
 $ ttd config set display.week_start sunday          # US-style weeks
 $ ttd config set tax.set_aside_rate 0.30            # 30% tax set-aside
 $ ttd config set invoice.tax_rate 0.08              # 8% tax on invoices
+$ ttd config set invoice.attach_receipts true       # embed receipts in PDF by default
 ```
+
+## Invoice receipts
+
+`invoice.attach_receipts` (default `false`) makes `invoice render` and TUI
+render (`e`) include expense receipt pages in the PDF without passing
+`--receipts` each time. Markdown output is unavailable when receipts are
+included — receipts embed only in PDF. See [Expenses](expenses.md) and
+[Invoicing](invoicing.md#rendering-pdf-and-markdown).
 
 ## Every setting
 
