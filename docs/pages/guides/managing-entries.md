@@ -1,7 +1,7 @@
 # Managing entries
 
 Listing, correcting, and deleting logged time. For creating entries, see
-[Tracking time](tracking-time.md).
+[Tracking time](tracking-time.md). For expenses, see [Expenses](expenses.md).
 
 ## Listing entries
 
@@ -51,17 +51,21 @@ it — the ledger always matches what you billed. To change billed work, void
 the invoice first ([`ttd invoice mark NUMBER void`](invoicing.md#the-invoice-lifecycle)),
 which releases its entries, then edit and re-invoice.
 
-## The timesheet screen
+## The log screen
 
-Screen `2` in the TUI is the same data, browsable:
+Screen `2` in the TUI shows the current month's time entries and expenses in
+two stacked tables:
 
-![Timesheet, week view](../assets/screenshots/timesheet-week.svg)
+![Log, month view](../assets/screenshots/log-month.svg)
 
 | Key | Action |
 | --- | --- |
-| `d` / `w` / `m` | day / week / month span |
-| `[` / `]` | previous / next period |
-| `g` | jump to today |
-| `a` | add an entry |
-| `e` | edit the selected entry |
-| `x` | delete the selected entry (confirms first) |
+| `[` / `]` | previous / next month |
+| `g` | jump to this month |
+| `tab` | switch focus: time table ↔ expenses table |
+| `e` | edit the selected row (section-aware) |
+| `x` | delete the selected row (confirms first) |
+| `l` | add time or expense (global chooser) |
+
+Expense rows use the same edit/delete keys when the expenses section is
+focused. Invoiced expenses cannot be changed until the invoice is voided.

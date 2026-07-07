@@ -73,6 +73,13 @@ PAGES = [
         commands=["log"],
     ),
     Page(
+        "expense",
+        "ttd expense",
+        "Record and manage billable expenses (client chargebacks). See the"
+        " [Expenses guide](../../guides/expenses.md).",
+        commands=["expense"],
+    ),
+    Page(
         "report",
         "ttd report",
         "Summaries of logged time by day, week, month, or arbitrary range. See the"

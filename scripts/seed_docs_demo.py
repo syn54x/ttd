@@ -36,6 +36,22 @@ def _month_period(anchor: date):
     return Period(start=start, end=end, label=start.strftime("%B %Y"))
 
 
+async def seed_expenses() -> None:
+    """Current-month demo expenses for Log screen screenshots."""
+    from ttd.services import expenses as expense_svc
+    from ttd.storage.db import db_lifespan
+
+    today = date.today()
+    async with db_lifespan():
+        await expense_svc.add_expense(
+            "api-rewrite",
+            "Claude Code",
+            Decimal("100"),
+            incurred_date=today,
+            note="monthly subscription",
+        )
+
+
 async def seed_invoices_and_taxes() -> None:
     """Demo invoices in three states plus a recorded IRS payment."""
     from ttd.config.loader import get_settings
@@ -85,6 +101,7 @@ def seed_sandbox() -> None:
         check=True,
         capture_output=True,
     )
+    asyncio.run(seed_expenses())
     asyncio.run(seed_invoices_and_taxes())
 
 

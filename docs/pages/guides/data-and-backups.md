@@ -24,6 +24,9 @@ $ ttd db backup ~/Backups/       # or wherever you say
 Creates `ttd-YYYYMMDD-HHMMSS.db`. Restoring is copying the file back. Take
 one before bulk imports or anything you're unsure about.
 
+The `.db` file is the **authoritative** archive — it holds the full graph
+including expenses, receipts, and invoices.
+
 ## Health checks and migrations
 
 ```console
@@ -49,3 +52,8 @@ ledger. `--reset` wipes before seeding (it asks unless you pass `--yes`).
 
 A periodic `ttd export ledger.json` gives you a portable, human-readable
 snapshot alongside binary backups — see [Import & export](import-export.md).
+
+JSON envelope v2 includes **expenses** and **receipts** (base64) in addition
+to clients, projects, and entries. CSV and other tabular formats export
+entries only. For round-tripping expenses between machines, prefer JSON or a
+full `.db` copy.

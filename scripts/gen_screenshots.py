@@ -18,8 +18,6 @@ from seed_docs_demo import seed_sandbox  # sibling script, importable when run f
 OUT_DIR = Path(__file__).parent.parent / "docs" / "pages" / "assets" / "screenshots"
 SIZE = (100, 32)
 
-QUICKLOG_KEYS = {" ": "space", "-": "minus", ":": "colon"}
-
 
 async def _shot(name: str, keys: list[str], *, settle: int = 4) -> None:
     from ttd.tui.app import TtdApp
@@ -44,12 +42,12 @@ async def _generate() -> None:
     from ttd.storage.db import db_lifespan
 
     await _shot("dashboard", [])
-    await _shot("timesheet-week", ["2", "w"])
+    await _shot("log-month", ["2"])
     await _shot("clients-tree", ["3"])
     await _shot("reports-month", ["4", "m"])
     await _shot("invoices-list", ["5"])
     await _shot("taxes", ["6"])
-    await _shot("quicklog", ["l", *[QUICKLOG_KEYS.get(c, c) for c in "yesterday 9-11:30"]])
+    await _shot("quicklog", ["l"])
 
     os.environ["TTD_DISPLAY__THEME"] = "ttd-light"
     await _shot("dashboard-light", [])
