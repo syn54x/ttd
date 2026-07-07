@@ -8,8 +8,8 @@ def _seed_paid_invoice(tmp):
     """4h at $150 → $600 subtotal, paid 2026-05-10 (IRS Q2) at 32% set-aside."""
     runner.invoke(app, ["client", "add", "Acme", "--rate", "150"])
     runner.invoke(app, ["project", "add", "API", "--client", "acme"])
-    runner.invoke(app, ["log", "yesterday 9am to 11am", "-p", "api"])
-    runner.invoke(app, ["log", "yesterday 1pm to 3pm", "-p", "api"])
+    runner.invoke(app, ["log", "2026-06-08 9am to 11am", "-p", "api"])
+    runner.invoke(app, ["log", "2026-06-08 1pm to 3pm", "-p", "api"])
     runner.invoke(app, ["config", "set", "tax.set_aside_rate", "0.32"])
     runner.invoke(app, ["invoice", "create", "--client", "acme", "--month", "2026-06"])
     return runner.invoke(app, ["invoice", "mark", "2026-001", "paid", "--paid-date", "2026-05-10"])
@@ -75,7 +75,7 @@ def test_invoice_show_includes_set_aside(isolated_config):
 def test_draft_preview_shows_set_aside_hint(isolated_config):
     runner.invoke(app, ["client", "add", "Acme", "--rate", "150"])
     runner.invoke(app, ["project", "add", "API", "--client", "acme"])
-    runner.invoke(app, ["log", "yesterday 9am to 11am", "-p", "api"])
+    runner.invoke(app, ["log", "2026-06-08 9am to 11am", "-p", "api"])
     runner.invoke(app, ["config", "set", "tax.set_aside_rate", "0.32"])
     result = runner.invoke(
         app, ["invoice", "create", "--client", "acme", "--month", "2026-06", "--dry-run"]
