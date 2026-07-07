@@ -21,4 +21,4 @@ class TaxPayment(Model):
     amount: Decimal
     paid_on: Annotated[date, FerroField(db_type="date")]
     note: str = ""
-    created_at: datetime
+    created_at: Annotated[datetime, FerroField(db_type="timestamp")]

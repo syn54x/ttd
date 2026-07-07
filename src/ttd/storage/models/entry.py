@@ -19,13 +19,13 @@ class Entry(Model):
     id: Annotated[UUID | None, FerroField(primary_key=True)] = None
     project_id: Annotated[UUID, FerroField(index=True)]
     work_date: Annotated[date, FerroField(db_type="date", index=True)]
-    started_at: datetime | None = None
-    ended_at: datetime | None = None
+    started_at: Annotated[datetime | None, FerroField(db_type="timestamp")] = None
+    ended_at: Annotated[datetime | None, FerroField(db_type="timestamp")] = None
     seconds: int
     note: str = ""
     tags: str = ""
     billable: bool = True
     source: Annotated[EntrySource, FerroField(db_type="text")] = EntrySource.LOG
     invoice_id: Annotated[UUID | None, FerroField(index=True)] = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: Annotated[datetime, FerroField(db_type="timestamp")]
+    updated_at: Annotated[datetime, FerroField(db_type="timestamp")]
