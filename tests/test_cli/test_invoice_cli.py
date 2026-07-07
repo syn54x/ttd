@@ -7,8 +7,8 @@ runner = CliRunner()
 def _seed(tmp):
     runner.invoke(app, ["client", "add", "Acme", "--rate", "150"])
     runner.invoke(app, ["project", "add", "API", "--client", "acme"])
-    runner.invoke(app, ["log", "yesterday 9am to 11am", "-p", "api"])
-    runner.invoke(app, ["log", "yesterday 1pm to 3pm", "-p", "api"])
+    runner.invoke(app, ["log", "2026-06-08 9am to 11am", "-p", "api"])
+    runner.invoke(app, ["log", "2026-06-08 1pm to 3pm", "-p", "api"])
     runner.invoke(app, ["config", "set", "invoice.output_dir", str(tmp / "invoices")])
     runner.invoke(app, ["config", "set", "user.name", "Taylor"])
 
@@ -104,7 +104,16 @@ def test_invoiced_entries_locked_via_cli(isolated_config):
 def test_invoice_create_with_period_spec(isolated_config):
     _seed(isolated_config)
     result = runner.invoke(
-        app, ["invoice", "create", "--client", "acme", "--period", "last two weeks", "--dry-run"]
+        app,
+        [
+            "invoice",
+            "create",
+            "--client",
+            "acme",
+            "--period",
+            "2026-06-01 to 2026-06-30",
+            "--dry-run",
+        ],
     )
     assert result.exit_code == 0, result.output
     assert "Dry run" in result.output
