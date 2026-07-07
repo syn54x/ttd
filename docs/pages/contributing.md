@@ -34,6 +34,7 @@ The public site is built by [Zensical](https://zensical.org) from
 
 ```bash
 just docs-serve     # live-reloading local preview
+just docs-deploy    # publish to GitHub Pages (Actions workflow on main)
 just docs-cli       # regenerate reference/cli/ from the cyclopts app
 just docs-shots     # regenerate TUI screenshots (SVG) from demo data
 just docs-gifs      # re-record GIF walkthroughs (requires `brew install vhs`)
