@@ -11,7 +11,6 @@ on:
 permissions:
   contents: write
   id-token: write
-  pages: write
 
 concurrency:
   group: release
@@ -191,30 +190,10 @@ jobs:
 
   docs:
     needs: release
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: main
-          fetch-depth: 0
-
-      - uses: astral-sh/setup-uv@v6
-        with:
-          python-version: "3.14"
-          enable-cache: true
-
-      - name: Install dependencies
-        run: uv sync --frozen --all-groups
-
-      - name: Build documentation
-        run: uv run zensical build --clean
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-      - id: deployment
-        uses: actions/deploy-pages@v4
+    uses: ./.github/workflows/docs.yml
+    with:
+      ref: main
+    permissions:
+      contents: read
+      pages: write
+      id-token: write

@@ -60,6 +60,10 @@ docs-gifs:
 docs-serve:
     uv run zensical serve
 
+# Deploy the docs site to GitHub Pages (workflow_dispatch on main).
+docs-deploy:
+    gh workflow run docs.yml --ref main
+
 # Build wheel/sdist and verify the ttd CLI from the artifact (pre-release smoke).
 release-smoke:
     rm -rf dist/
